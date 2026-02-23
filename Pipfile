@@ -9,8 +9,10 @@ torchvision = ">=0.10.0"
 numpy = ">=1.19.0"
 pillow = "*"
 opencv-python = "*"
-matplotlib = "*"
 pymysql = "*"
+matplotlib = "*"
+pandas = "*"
+seaborn = "*"
 
 [dev-packages]
 
