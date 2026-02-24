@@ -4,9 +4,14 @@
 提供数据集的默认配置和配置管理
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from dataclasses import dataclass, field
+import os
+from ..utils.helpers import load_json, save_json
+from pathlib import Path
 
+DB_DATACONFIG_PATH = os.getenv("DB_DATA_CONFIG_PATH", "./data_configs")
+DB_PARTITION_PATH = os.getenv("DB_PARTITION_PATH", "./partition_configs")
 
 @dataclass
 class DatasetConfig:
@@ -43,145 +48,79 @@ class DatasetConfig:
     
     def to_dict(self) -> Dict[str, Any]:
         """转换为字典"""
-        # TODO: 实现转换为字典逻辑
-        pass
+        return {
+            "dataset_name": self.dataset_name,
+            "data_root": self.data_root,
+            "num_clients": self.num_clients,
+            "partition_strategy": self.partition_strategy,
+            "partition_params": self.partition_params,
+            "augment": self.augment,
+            "normalize": self.normalize,
+            "batch_size": self.batch_size,
+            "num_workers": self.num_workers,
+            "pin_memory": self.pin_memory,
+            "seed": self.seed,
+            "download": self.download,
+            "force_preprocess": self.force_preprocess,
+        }
     
     @classmethod
     def from_dict(cls, config_dict: Dict[str, Any]) -> "DatasetConfig":
         """从字典创建配置"""
-        # TODO: 实现从字典创建逻辑
-        pass
+        # 过滤掉不在 dataclass 中的字段
+        valid_fields = {f.name for f in cls.__dataclass_fields__.values()}
+        filtered_dict = {k: v for k, v in config_dict.items() if k in valid_fields}
+        return cls(**filtered_dict)
     
     def update(self, **kwargs) -> "DatasetConfig":
-        """更新配置"""
-        # TODO: 实现更新配置逻辑
-        pass
-
-
-# 默认数据集配置
-DEFAULT_DATASET_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "mnist": {
-        "num_classes": 10,
-        "num_features": 784,
-        "input_shape": (1, 28, 28),
-        "train_samples": 60000,
-        "test_samples": 10000,
-        "data_type": "image",
-        "task_type": "classification",
-        "class_names": ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
-        # 模块路径
-        "raw_dataset_module": "datasets.mnist.raw",
-        "raw_dataset_class": "MNISTRawDataset",
-        "preprocessor_module": "datasets.mnist.preprocess",
-        "preprocessor_class": "MNISTPreprocessor",
-        "partitioner_module": "datasets.mnist.partition",
-        "partitioner_class": "MNISTPartitioner",
-    },
-    "cifar10": {
-        "num_classes": 10,
-        "num_features": 3072,
-        "input_shape": (3, 32, 32),
-        "train_samples": 50000,
-        "test_samples": 10000,
-        "data_type": "image",
-        "task_type": "classification",
-        "class_names": [
-            'airplane', 'automobile', 'bird', 'cat', 'deer',
-            'dog', 'frog', 'horse', 'ship', 'truck'
-        ],
-        # 模块路径
-        "raw_dataset_module": "datasets.cifar10.raw",
-        "raw_dataset_class": "CIFAR10RawDataset",
-        "preprocessor_module": "datasets.cifar10.preprocess",
-        "preprocessor_class": "CIFAR10Preprocessor",
-        "partitioner_module": "datasets.cifar10.partition",
-        "partitioner_class": "CIFAR10Partitioner",
-    },
-    "fashion_mnist": {
-        "num_classes": 10,
-        "num_features": 784,
-        "input_shape": (1, 28, 28),
-        "train_samples": 60000,
-        "test_samples": 10000,
-        "data_type": "image",
-        "task_type": "classification",
-        "class_names": [
-            'T-shirt/top', 'Trouser', 'Pullover', 'Dress', 'Coat',
-            'Sandal', 'Shirt', 'Sneaker', 'Bag', 'Ankle boot'
-        ],
-        # 模块路径
-        "raw_dataset_module": "datasets.fashion_mnist.raw",
-        "raw_dataset_class": "FashionMNISTRawDataset",
-        "preprocessor_module": "datasets.fashion_mnist.preprocess",
-        "preprocessor_class": "FashionMNISTPreprocessor",
-        "partitioner_module": "datasets.fashion_mnist.partition",
-        "partitioner_class": "FashionMNISTPartitioner",
-    },
-}
-
-# 默认划分策略配置
-DEFAULT_PARTITION_CONFIGS: Dict[str, Dict[str, Any]] = {
-    "iid": {
-        "description": "独立同分布划分",
-        "strategy_type": "iid",
-        "default_params": {},
-    },
-    "dirichlet": {
-        "description": "Dirichlet分布Non-IID划分",
-        "strategy_type": "non-iid",
-        "default_params": {"alpha": 0.5},
-        "param_schema": {
-            "alpha": {
-                "type": "float",
-                "default": 0.5,
-                "description": "Dirichlet分布参数，越小越Non-IID",
-                "min": 0.01,
-                "max": 100.0,
-            }
-        },
-    },
-    "pathological": {
-        "description": "病态Non-IID划分",
-        "strategy_type": "non-iid",
-        "default_params": {"shards_per_client": 2},
-        "param_schema": {
-            "shards_per_client": {
-                "type": "int",
-                "default": 2,
-                "description": "每个客户端的类别数",
-                "min": 1,
-            }
-        },
-    },
-}
+        """更新配置并返回自身（支持链式调用）"""
+        for key, value in kwargs.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+        return self
 
 
 def get_dataset_config(dataset_name: str) -> Dict[str, Any]:
     """
-    获取数据集默认配置
+    从数据库目录加载数据集配置
     
     Args:
         dataset_name: 数据集名称
         
     Returns:
         数据集配置字典
+        
+    Raises:
+        FileNotFoundError: 当数据集配置不存在时
     """
-    # TODO: 实现获取数据集配置逻辑
-    pass
+    config_file = Path(DB_DATACONFIG_PATH) / dataset_name / "config.json"
+    
+    if not config_file.exists():
+        raise FileNotFoundError(f"数据集 '{dataset_name}' 的配置不存在: {config_file}")
+    
+    return load_json(config_file)
+
 
 
 def get_partition_config(strategy: str) -> Dict[str, Any]:
     """
-    获取划分策略配置
+    从配置目录加载划分策略配置
     
     Args:
         strategy: 划分策略名称
         
     Returns:
         划分策略配置字典
+        
+    Raises:
+        FileNotFoundError: 当划分策略配置不存在时
     """
-    # TODO: 实现获取划分策略配置逻辑
-    pass
+    config_file = Path(DB_PARTITION_PATH) / f"{strategy}.json"
+    
+    if not config_file.exists():
+        raise FileNotFoundError(f"划分策略 '{strategy}' 的配置不存在: {config_file}")
+    
+    return load_json(config_file)
 
 
 def build_config(
@@ -189,20 +128,57 @@ def build_config(
     num_clients: int = 10,
     partition_strategy: str = "iid",
     partition_params: Optional[Dict[str, Any]] = None,
+    save_path: Optional[str] = None,
     **kwargs
 ) -> DatasetConfig:
     """
     构建数据集配置
     
+    从各自配置目录加载数据集和划分策略配置，构建完整的 DatasetConfig 对象。
+    如提供 save_path，将配置保存到指定路径。
+    
     Args:
         dataset_name: 数据集名称
         num_clients: 客户端数量
         partition_strategy: 划分策略
-        partition_params: 划分参数
-        **kwargs: 其他参数
+        partition_params: 划分参数，如为 None 则使用策略默认参数
+        save_path: 配置保存路径，如为 None 则不保存
+        **kwargs: 其他参数覆盖（如 data_root, batch_size 等）
         
     Returns:
         数据集配置对象
     """
-    # TODO: 实现构建配置逻辑
-    pass
+    # 加载数据集配置
+    dataset_info = get_dataset_config(dataset_name)
+    
+    # 加载划分策略配置，获取默认参数
+    if partition_params is None:
+        try:
+            strategy_config = get_partition_config(partition_strategy)
+            partition_params = strategy_config.get("default_params", {})
+        except FileNotFoundError:
+            partition_params = {}
+    
+    # 构建配置对象
+    config = DatasetConfig(
+        dataset_name=dataset_name,
+        num_clients=num_clients,
+        partition_strategy=partition_strategy,
+        partition_params=partition_params,
+    )
+    
+    # 应用其他参数覆盖
+    for key, value in kwargs.items():
+        if hasattr(config, key):
+            setattr(config, key, value)
+    
+    # 保存配置到文件（如指定路径）
+    if save_path is not None:
+        save_path = Path(save_path)
+        save_path.parent.mkdir(parents=True, exist_ok=True)
+        # 确保路径以 .json 结尾
+        if save_path.suffix != ".json":
+            save_path = save_path.with_suffix(".json")
+        save_json(config.to_dict(), save_path)
+    
+    return config
