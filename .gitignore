@@ -33,10 +33,17 @@ env/
 *.swo
 *~
 
-# 数据（根据需要调整）
-data/raw/
-data/processed/
-!data/.gitkeep
+# 数据目录（保留结构，忽略内容）
+/data/*
+!/data/.gitkeep
+
+# 划分策略配置目录（保留结构，忽略内容）
+/partition_configs/*
+!/partition_configs/.gitkeep
+
+# 数据集配置目录（保留结构，忽略内容）
+/data_configs/*
+!/data_configs/.gitkeep
 
 # 日志和输出
 *.log

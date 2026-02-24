@@ -11,7 +11,6 @@ from pathlib import Path
 import torch
 from torch.utils.data import Dataset
 
-
 class RawDatasetBase(ABC):
     """
     原始数据集抽象基类
@@ -33,50 +32,62 @@ class RawDatasetBase(ABC):
             dataset_name: 数据集名称
             **kwargs: 其他数据集特定参数
         """
-        # TODO: 初始化基础属性
-        pass
+        self._data_root = Path(data_root)
+        self._dataset_name = dataset_name
+        self._kwargs = kwargs
+        
+        # 确保数据目录存在
+        self._ensure_data_dir()
+    
+    @property
+    def data_root(self) -> Path:
+        """数据根目录"""
+        return self._data_root
+    
+    @property
+    def dataset_name(self) -> str:
+        """数据集名称"""
+        return self._dataset_name
     
     @property
     @abstractmethod
     def name(self) -> str:
-        """数据集名称"""
-        # TODO: 返回数据集名称
+        """数据集名称（子类实现）"""
         pass
     
     @property
     @abstractmethod
     def num_classes(self) -> int:
-        """类别数量"""
-        # TODO: 返回类别数
+        """类别数量（子类实现）"""
         pass
     
     @property
     @abstractmethod
     def num_features(self) -> int:
-        """特征维度"""
-        # TODO: 返回特征维度
+        """特征维度（子类实现）"""
         pass
     
     @property
     @abstractmethod
     def input_shape(self) -> Tuple[int, ...]:
-        """输入数据形状"""
-        # TODO: 返回输入形状，如 (3, 32, 32) 或 (784,)
+        """输入数据形状，如 (3, 32, 32) 或 (784,)（子类实现）"""
         pass
     
     @property
     @abstractmethod
     def train_samples(self) -> int:
-        """训练样本数"""
-        # TODO: 返回训练样本数
+        """训练样本数（子类实现）"""
         pass
     
     @property
     @abstractmethod
     def test_samples(self) -> int:
-        """测试样本数"""
-        # TODO: 返回测试样本数
+        """测试样本数（子类实现）"""
         pass
+    
+    def _ensure_data_dir(self) -> None:
+        """确保数据目录存在"""
+        self._data_root.mkdir(parents=True, exist_ok=True)
     
     @abstractmethod
     def download(self) -> None:
@@ -85,7 +96,6 @@ class RawDatasetBase(ABC):
         
         如果数据已存在则跳过
         """
-        # TODO: 实现数据下载逻辑
         pass
     
     @abstractmethod
@@ -127,8 +137,7 @@ class RawDatasetBase(ABC):
         Returns:
             包含数据集元信息的字典
         """
-        # TODO: 返回数据集信息字典
-        return {
+        info = {
             "name": self.name,
             "num_classes": self.num_classes,
             "num_features": self.num_features,
@@ -136,3 +145,10 @@ class RawDatasetBase(ABC):
             "train_samples": self.train_samples,
             "test_samples": self.test_samples,
         }
+        
+        # 添加类别名称（如果可用）
+        class_names = self.get_class_names()
+        if class_names is not None:
+            info["class_names"] = class_names
+        
+        return info
