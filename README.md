@@ -14,6 +14,8 @@
 - **动态导入**: 基于数据库的模块动态导入系统，支持运行时数据集发现和加载
 - **统一接口**: 所有数据集遵循统一的基类接口，易于扩展新数据集
 - **联邦学习优化**: 专为联邦学习场景设计，支持客户端数据管理和分布统计
+- **懒加载模式**: `FederatedDatasetManager` 支持按需数据准备，提高启动速度
+- **划分持久化**: 支持划分结果的保存和加载，确保实验可复现
 
 ## 📁 项目结构
 
@@ -21,13 +23,14 @@
 .
 ├── __init__.py                 # 包入口，导出主要API
 ├── README.md                   # 本文档
+├── AGENTS.md                   # AI Agent 指引文档
 ├── ARCHITECTURE.md             # 架构设计文档
 │
 ├── core/                       # 核心基类模块
 │   ├── raw_dataset_base.py     # 原始数据集基类
 │   ├── preprocessor_base.py    # 预处理器基类
-│   ├── partitioner_base.py     # 划分器基类
-│   └── dataset_manager_base.py # 管理器基类
+│   ├── partitioner_base.py     # 划分器基类（含 IID/Dirichlet/Pathological 实现）
+│   └── dataset_manager_base.py # 管理器基类（含 FederatedDatasetManager 实现）
 │
 ├── database/                   # 数据库模块
 │   ├── models.py               # 数据模型定义
@@ -84,7 +87,54 @@ partitioner = MNISTPartitioner.create(
 client_indices = partitioner.partition(raw_dataset.load_train_data())
 ```
 
-#### 方式2：通过工厂动态创建（推荐）
+#### 方式2：使用 FederatedDatasetManager（推荐）
+
+```python
+from core import FederatedDatasetManager
+from datasets.mnist import MNISTRawDataset, MNISTPreprocessor, MNISTPartitioner
+
+# 定义管理器
+class MNISTFederatedManager(FederatedDatasetManager):
+    @property
+    def dataset_name(self) -> str:
+        return "mnist"
+    
+    @property
+    def raw_dataset_class(self):
+        return MNISTRawDataset
+    
+    @property
+    def preprocessor_class(self):
+        return MNISTPreprocessor
+    
+    @property
+    def partitioner_class(self):
+        return MNISTPartitioner
+
+# 创建管理器
+manager = MNISTFederatedManager(
+    data_root="./data",
+    num_clients=10,
+    partition_strategy="dirichlet",
+    partition_params={"alpha": 0.5},
+    seed=42
+)
+
+# 准备数据（懒加载：第一次访问时才真正准备）
+manager.prepare_data()
+
+# 获取客户端数据加载器
+loader = manager.get_client_loader(0, batch_size=32)
+
+# 获取划分统计信息
+partition_info = manager.get_partition_info()
+print(partition_info["statistics"])
+
+# 保存划分结果
+manager.save_split("./splits/mnist_split.json")
+```
+
+#### 方式3：通过工厂动态创建
 
 ```python
 from database import DatasetFactory, DatasetRegistry
@@ -122,9 +172,38 @@ loader = manager.get_client_loader(0, batch_size=32)
 
 | 策略 | 类型 | 描述 | 关键参数 |
 |------|------|------|----------|
-| **IID** | IID | 独立同分布随机划分 | 无 |
-| **Dirichlet** | Non-IID | 基于 Dirichlet 分布的划分 | `alpha`: 浓度参数，越小越 Non-IID |
-| **Pathological** | Non-IID | 每个客户端只获得特定类别 | `shards_per_client`: 每个客户端的类别数 |
+| **IID** | IID | 随机打乱后均匀分配 | 无 |
+| **Dirichlet** | Non-IID | 基于 Dirichlet 分布的类别偏斜划分 | `alpha`: 浓度参数，越小越 Non-IID |
+| **Pathological** | Non-IID | 按类别排序后分片，每个客户端获得特定数量的类别 | `shards_per_client`: 每个客户端的类别数 |
+
+### 划分策略使用示例
+
+```python
+from core import IIDPartitioner, DirichletPartitioner, PathologicalPartitioner
+
+# IID 划分
+iid_partitioner = IIDPartitioner(num_clients=10, seed=42)
+client_indices = iid_partitioner.partition(dataset)
+
+# Dirichlet 划分 (alpha=0.5 会产生较明显的 Non-IID)
+dirichlet_partitioner = DirichletPartitioner(num_clients=10, alpha=0.5, seed=42)
+client_indices = dirichlet_partitioner.partition(dataset)
+
+# Pathological 划分 (每个客户端获得 2 个类别)
+pathological_partitioner = PathologicalPartitioner(num_clients=10, shards_per_client=2, seed=42)
+client_indices = pathological_partitioner.partition(dataset)
+
+# 获取划分统计信息
+stats = dirichlet_partitioner.get_statistics(dataset, client_indices)
+print(stats["samples_per_client"])  # 每个客户端的样本数
+print(stats["distribution"])        # 每个客户端的类别分布
+
+# 保存划分结果
+dirichlet_partitioner.save_partition(client_indices, "./split.json")
+
+# 加载划分结果
+loaded_indices = dirichlet_partitioner.load_partition("./split.json")
+```
 
 ## 🏗️ 架构设计
 
@@ -143,20 +222,27 @@ loader = manager.get_client_loader(0, batch_size=32)
 1. 创建数据集目录：`mkdir datasets/my_dataset`
 2. 实现原始数据集类（继承 `RawDatasetBase`）
 3. 实现预处理器类（继承 `PreprocessorBase`）
-4. 实现划分器类（继承 `PartitionerBase`）
+4. 实现划分器类（继承 `IIDPartitioner`、`DirichletPartitioner` 或 `PathologicalPartitioner`）
 5. 在 `__init__.py` 中导出组件
-6. 注册到数据库
+6. 在 `configs/default_configs.py` 中添加配置
+7. 注册到数据库（可选）
 
-详细步骤请参见 [ARCHITECTURE.md#添加新数据集的步骤](./ARCHITECTURE.md#添加新数据集的步骤)。
+详细步骤请参见 [AGENTS.md#添加新数据集](./AGENTS.md#任务1-添加新数据集)。
 
 ## 📖 文档
 
+- [AGENTS.md](./AGENTS.md) - AI Agent 指引文档
 - [ARCHITECTURE.md](./ARCHITECTURE.md) - 详细架构设计文档
 - [core/README.md](./core/README.md) - 核心基类模块文档
+- [core/AGENTS.md](./core/AGENTS.md) - Core 模块 AI Agent 指引
 - [database/README.md](./database/README.md) - 数据库模块文档
+- [database/AGENTS.md](./database/AGENTS.md) - Database 模块 AI Agent 指引
 - [datasets/README.md](./datasets/README.md) - 数据集模块文档
+- [datasets/AGENTS.md](./datasets/AGENTS.md) - Datasets 模块 AI Agent 指引
 - [configs/README.md](./configs/README.md) - 配置模块文档
+- [configs/AGENTS.md](./configs/AGENTS.md) - Configs 模块 AI Agent 指引
 - [utils/README.md](./utils/README.md) - 工具模块文档
+- [utils/AGENTS.md](./utils/AGENTS.md) - Utils 模块 AI Agent 指引
 
 ## 🤝 贡献
 
