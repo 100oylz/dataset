@@ -50,10 +50,10 @@ class RawDatasetBase(ABC):
         return self._dataset_name
     
     @property
-    @abstractmethod
     def name(self) -> str:
         """数据集名称（子类实现）"""
-        pass
+        return self._dataset_name
+
     
     @property
     @abstractmethod
