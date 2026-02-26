@@ -48,14 +48,22 @@ class FashionMNISTPreprocessor(PreprocessorBase):
             rotation_degrees: 随机旋转角度
             **kwargs: 其他参数
         """
-        # TODO: 初始化Fashion-MNIST预处理器
-        pass
+        super().__init__(dataset_name, **kwargs)
+        self.augment = augment
+        self.rotation_degrees = rotation_degrees
+        
+        # 存储参数
+        self._params = {
+            "augment": augment,
+            "rotation_degrees": rotation_degrees,
+            "mean": self.MEAN,
+            "std": self.STD
+        }
     
     @property
     def name(self) -> str:
         """预处理器名称"""
-        # TODO: 返回"fashion_mnist_preprocessor"
-        pass
+        return "fashion_mnist_preprocessor"
     
     def fit(self, dataset: Dataset) -> "FashionMNISTPreprocessor":
         """
@@ -69,28 +77,52 @@ class FashionMNISTPreprocessor(PreprocessorBase):
         Returns:
             self
         """
-        # TODO: 实现拟合逻辑
-        pass
+        # Fashion-MNIST使用预计算的统计量，无需拟合
+        return self
     
     def get_train_transform(self) -> Callable:
         """
         获取Fashion-MNIST训练变换
         
+        包括：
+        - 数据增强（可选）
+        - 转换为Tensor
+        - 归一化
+        
         Returns:
             训练变换函数
         """
-        # TODO: 实现Fashion-MNIST训练变换
-        pass
+        transform_list = []
+        
+        # 数据增强
+        if self.augment:
+            transform_list.append(
+                transforms.RandomRotation(degrees=self.rotation_degrees)
+            )
+        
+        # 转换为Tensor并归一化
+        transform_list.append(transforms.ToTensor())
+        transform_list.append(
+            transforms.Normalize(mean=self.MEAN, std=self.STD)
+        )
+        
+        return transforms.Compose(transform_list)
     
     def get_test_transform(self) -> Callable:
         """
         获取Fashion-MNIST测试变换
         
+        包括：
+        - 转换为Tensor
+        - 归一化
+        
         Returns:
             测试变换函数
         """
-        # TODO: 实现Fashion-MNIST测试变换
-        pass
+        return transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=self.MEAN, std=self.STD)
+        ])
     
     def inverse_transform(self, data: torch.Tensor) -> torch.Tensor:
         """
@@ -102,25 +134,26 @@ class FashionMNISTPreprocessor(PreprocessorBase):
         Returns:
             反归一化数据
         """
-        # TODO: 实现Fashion-MNIST反归一化
-        pass
+        mean = torch.tensor(self.MEAN, device=data.device).view(-1, 1, 1)
+        std = torch.tensor(self.STD, device=data.device).view(-1, 1, 1)
+        return data * std + mean
     
     def save_params(self, path: str) -> None:
         """保存预处理参数"""
-        # TODO: 实现保存参数逻辑
-        pass
+        super().save_params(path)
     
     def load_params(self, path: str) -> "FashionMNISTPreprocessor":
         """加载预处理参数"""
-        # TODO: 实现加载参数逻辑
-        pass
+        super().load_params(path)
+        return self
     
     def get_params(self) -> Dict[str, Any]:
         """获取预处理参数"""
-        # TODO: 返回Fashion-MNIST预处理参数
-        pass
+        return self._params.copy()
     
     def set_params(self, params: Dict[str, Any]) -> "FashionMNISTPreprocessor":
         """设置预处理参数"""
-        # TODO: 设置Fashion-MNIST预处理参数
-        pass
+        self._params.update(params)
+        self.augment = params.get("augment", self.augment)
+        self.rotation_degrees = params.get("rotation_degrees", self.rotation_degrees)
+        return self

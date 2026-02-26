@@ -38,8 +38,18 @@ class CIFAR10Partitioner:
         Returns:
             划分器实例
         """
-        # TODO: 根据策略创建对应的划分器
-        pass
+        strategy = strategy.lower()
+        
+        if strategy == "iid":
+            return CIFAR10IIDPartitioner(num_clients, seed)
+        elif strategy == "dirichlet":
+            alpha = kwargs.get("alpha", 0.5)
+            return CIFAR10DirichletPartitioner(num_clients, alpha, seed)
+        elif strategy == "pathological":
+            shards_per_client = kwargs.get("shards_per_client", 2)
+            return CIFAR10PathologicalPartitioner(num_clients, shards_per_client, seed)
+        else:
+            raise ValueError(f"Unknown strategy: {strategy}")
 
 
 class CIFAR10IIDPartitioner(IIDPartitioner):
@@ -57,20 +67,17 @@ class CIFAR10IIDPartitioner(IIDPartitioner):
             num_clients: 客户端数量
             seed: 随机种子
         """
-        # TODO: 初始化CIFAR-10 IID划分器
-        pass
+        super().__init__(num_clients, seed)
     
     @property
     def name(self) -> str:
         """划分器名称"""
-        # TODO: 返回"cifar10_iid"
-        pass
+        return "cifar10_iid"
     
     @property
     def strategy_type(self) -> str:
         """策略类型"""
-        # TODO: 返回"iid"
-        pass
+        return "iid"
     
     def partition(self, dataset: Dataset) -> Dict[int, List[int]]:
         """
@@ -82,8 +89,8 @@ class CIFAR10IIDPartitioner(IIDPartitioner):
         Returns:
             {client_id: [indices]} 字典
         """
-        # TODO: 实现CIFAR-10 IID划分逻辑
-        pass
+        # 调用父类的IID划分逻辑
+        return super().partition(dataset)
 
 
 class CIFAR10DirichletPartitioner(DirichletPartitioner):
@@ -111,20 +118,17 @@ class CIFAR10DirichletPartitioner(DirichletPartitioner):
             alpha: Dirichlet参数
             seed: 随机种子
         """
-        # TODO: 初始化CIFAR-10 Dirichlet划分器
-        pass
+        super().__init__(num_clients, alpha, seed)
     
     @property
     def name(self) -> str:
         """划分器名称"""
-        # TODO: 返回"cifar10_dirichlet"
-        pass
+        return "cifar10_dirichlet"
     
     @property
     def strategy_type(self) -> str:
         """策略类型"""
-        # TODO: 返回"non-iid"
-        pass
+        return "non-iid"
     
     def partition(self, dataset: Dataset) -> Dict[int, List[int]]:
         """
@@ -136,8 +140,8 @@ class CIFAR10DirichletPartitioner(DirichletPartitioner):
         Returns:
             {client_id: [indices]} 字典
         """
-        # TODO: 实现CIFAR-10 Dirichlet划分逻辑
-        pass
+        # 调用父类的Dirichlet划分逻辑
+        return super().partition(dataset)
 
 
 class CIFAR10PathologicalPartitioner(PathologicalPartitioner):
@@ -164,20 +168,17 @@ class CIFAR10PathologicalPartitioner(PathologicalPartitioner):
             shards_per_client: 每个客户端的类别数
             seed: 随机种子
         """
-        # TODO: 初始化CIFAR-10病态划分器
-        pass
+        super().__init__(num_clients, shards_per_client, seed)
     
     @property
     def name(self) -> str:
         """划分器名称"""
-        # TODO: 返回"cifar10_pathological"
-        pass
+        return "cifar10_pathological"
     
     @property
     def strategy_type(self) -> str:
         """策略类型"""
-        # TODO: 返回"non-iid"
-        pass
+        return "non-iid"
     
     def partition(self, dataset: Dataset) -> Dict[int, List[int]]:
         """
@@ -189,5 +190,5 @@ class CIFAR10PathologicalPartitioner(PathologicalPartitioner):
         Returns:
             {client_id: [indices]} 字典
         """
-        # TODO: 实现CIFAR-10病态划分逻辑
-        pass
+        # 调用父类的Pathological划分逻辑
+        return super().partition(dataset)

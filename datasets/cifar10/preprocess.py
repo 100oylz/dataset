@@ -50,14 +50,24 @@ class CIFAR10Preprocessor(PreprocessorBase):
             flip_prob: 水平翻转概率
             **kwargs: 其他参数
         """
-        # TODO: 初始化CIFAR-10预处理器
-        pass
+        super().__init__(dataset_name, **kwargs)
+        self.augment = augment
+        self.crop_padding = crop_padding
+        self.flip_prob = flip_prob
+        
+        # 存储参数
+        self._params = {
+            "augment": augment,
+            "crop_padding": crop_padding,
+            "flip_prob": flip_prob,
+            "mean": self.MEAN,
+            "std": self.STD
+        }
     
     @property
     def name(self) -> str:
         """预处理器名称"""
-        # TODO: 返回"cifar10_preprocessor"
-        pass
+        return "cifar10_preprocessor"
     
     def fit(self, dataset: Dataset) -> "CIFAR10Preprocessor":
         """
@@ -71,8 +81,8 @@ class CIFAR10Preprocessor(PreprocessorBase):
         Returns:
             self
         """
-        # TODO: 实现拟合逻辑（CIFAR-10无需拟合）
-        pass
+        # CIFAR-10使用预计算的统计量，无需拟合
+        return self
     
     def get_train_transform(self) -> Callable:
         """
@@ -87,8 +97,24 @@ class CIFAR10Preprocessor(PreprocessorBase):
         Returns:
             训练变换函数
         """
-        # TODO: 实现CIFAR-10训练变换
-        pass
+        transform_list = []
+        
+        # 数据增强
+        if self.augment:
+            transform_list.append(
+                transforms.RandomCrop(32, padding=self.crop_padding)
+            )
+            transform_list.append(
+                transforms.RandomHorizontalFlip(p=self.flip_prob)
+            )
+        
+        # 转换为Tensor并归一化
+        transform_list.append(transforms.ToTensor())
+        transform_list.append(
+            transforms.Normalize(mean=self.MEAN, std=self.STD)
+        )
+        
+        return transforms.Compose(transform_list)
     
     def get_test_transform(self) -> Callable:
         """
@@ -101,8 +127,10 @@ class CIFAR10Preprocessor(PreprocessorBase):
         Returns:
             测试变换函数
         """
-        # TODO: 实现CIFAR-10测试变换
-        pass
+        return transforms.Compose([
+            transforms.ToTensor(),
+            transforms.Normalize(mean=self.MEAN, std=self.STD)
+        ])
     
     def inverse_transform(self, data: torch.Tensor) -> torch.Tensor:
         """
@@ -114,8 +142,9 @@ class CIFAR10Preprocessor(PreprocessorBase):
         Returns:
             反归一化数据
         """
-        # TODO: 实现CIFAR-10反归一化
-        pass
+        mean = torch.tensor(self.MEAN, device=data.device).view(-1, 1, 1)
+        std = torch.tensor(self.STD, device=data.device).view(-1, 1, 1)
+        return data * std + mean
     
     def save_params(self, path: str) -> None:
         """
@@ -124,8 +153,7 @@ class CIFAR10Preprocessor(PreprocessorBase):
         Args:
             path: 保存路径
         """
-        # TODO: 实现保存参数逻辑
-        pass
+        super().save_params(path)
     
     def load_params(self, path: str) -> "CIFAR10Preprocessor":
         """
@@ -137,8 +165,8 @@ class CIFAR10Preprocessor(PreprocessorBase):
         Returns:
             self
         """
-        # TODO: 实现加载参数逻辑
-        pass
+        super().load_params(path)
+        return self
     
     def get_params(self) -> Dict[str, Any]:
         """
@@ -147,8 +175,7 @@ class CIFAR10Preprocessor(PreprocessorBase):
         Returns:
             预处理参数字典
         """
-        # TODO: 返回CIFAR-10预处理参数
-        pass
+        return self._params.copy()
     
     def set_params(self, params: Dict[str, Any]) -> "CIFAR10Preprocessor":
         """
@@ -160,5 +187,8 @@ class CIFAR10Preprocessor(PreprocessorBase):
         Returns:
             self
         """
-        # TODO: 设置CIFAR-10预处理参数
-        pass
+        self._params.update(params)
+        self.augment = params.get("augment", self.augment)
+        self.crop_padding = params.get("crop_padding", self.crop_padding)
+        self.flip_prob = params.get("flip_prob", self.flip_prob)
+        return self

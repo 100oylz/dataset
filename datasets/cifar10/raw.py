@@ -45,44 +45,40 @@ class CIFAR10RawDataset(RawDatasetBase):
             download: 是否自动下载
             **kwargs: 其他参数
         """
-        # TODO: 初始化CIFAR-10原始数据集
-        pass
+        super().__init__(data_root, "cifar10", **kwargs)
+        self._download = download
+        self._train_dataset: Optional[Dataset] = None
+        self._test_dataset: Optional[Dataset] = None
     
     @property
     def name(self) -> str:
         """数据集名称"""
-        # TODO: 返回"cifar10"
-        pass
+        return "cifar10"
     
     @property
     def num_classes(self) -> int:
         """类别数量"""
-        # TODO: 返回10
-        pass
+        return self.NUM_CLASSES
     
     @property
     def num_features(self) -> int:
         """特征维度"""
-        # TODO: 返回3072
-        pass
+        return self.NUM_FEATURES
     
     @property
     def input_shape(self) -> Tuple[int, ...]:
         """输入数据形状"""
-        # TODO: 返回(3, 32, 32)
-        pass
+        return self.INPUT_SHAPE
     
     @property
     def train_samples(self) -> int:
         """训练样本数"""
-        # TODO: 返回50000
-        pass
+        return self.TRAIN_SAMPLES
     
     @property
     def test_samples(self) -> int:
         """测试样本数"""
-        # TODO: 返回10000
-        pass
+        return self.TEST_SAMPLES
     
     def download(self) -> None:
         """
@@ -90,8 +86,18 @@ class CIFAR10RawDataset(RawDatasetBase):
         
         使用torchvision自动下载
         """
-        # TODO: 实现CIFAR-10下载逻辑
-        pass
+        # 通过加载训练集触发下载
+        tv_datasets.CIFAR10(
+            root=self._data_root,
+            train=True,
+            download=True
+        )
+        # 通过加载测试集触发下载
+        tv_datasets.CIFAR10(
+            root=self._data_root,
+            train=False,
+            download=True
+        )
     
     def load_train_data(self) -> Dataset:
         """
@@ -100,8 +106,13 @@ class CIFAR10RawDataset(RawDatasetBase):
         Returns:
             原始CIFAR-10训练数据集（未经预处理）
         """
-        # TODO: 实现加载CIFAR-10训练集逻辑
-        pass
+        if self._train_dataset is None:
+            self._train_dataset = tv_datasets.CIFAR10(
+                root=self._data_root,
+                train=True,
+                download=self._download
+            )
+        return self._train_dataset
     
     def load_test_data(self) -> Dataset:
         """
@@ -110,8 +121,13 @@ class CIFAR10RawDataset(RawDatasetBase):
         Returns:
             原始CIFAR-10测试数据集（未经预处理）
         """
-        # TODO: 实现加载CIFAR-10测试集逻辑
-        pass
+        if self._test_dataset is None:
+            self._test_dataset = tv_datasets.CIFAR10(
+                root=self._data_root,
+                train=False,
+                download=self._download
+            )
+        return self._test_dataset
     
     def get_class_names(self) -> List[str]:
         """
@@ -120,5 +136,4 @@ class CIFAR10RawDataset(RawDatasetBase):
         Returns:
             类别名称列表
         """
-        # TODO: 返回CLASS_NAMES
-        pass
+        return self.CLASS_NAMES
