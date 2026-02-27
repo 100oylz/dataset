@@ -17,8 +17,8 @@
 **核心类**:
 - `RawDatasetBase`: 原始数据集基类
   - 职责: 数据下载、加载、提供元信息
-  - 关键属性: `num_classes`, `input_shape`, `train_samples`, `name`
-  - 注意: `name` 属性已实现，返回 `_dataset_name`
+  - 关键属性: `num_classes`, `num_features`, `input_shape`, `train_samples`, `test_samples`, `name`
+  - 已实现方法: `get_dataset_info()`, `get_class_names()`
   
 - `PreprocessorBase`: 预处理器基类
   - 职责: 数据预处理、增强、归一化
@@ -48,7 +48,7 @@
   
 - `DatasetManagerBase`: 管理器基类
   - 职责: 协调 raw/preprocessor/partitioner
-  - 关键方法: `prepare_data()`, `get_client_loader()`, `save_split()`, `load_split()`
+  - 关键方法: `prepare_data()`, `get_client_loader()`, `get_test_loader()`, `save_split()`, `load_split()`
   
 - `FederatedDatasetManager`: 联邦学习管理器（已实现）
   - 职责: 完整的联邦学习数据管理功能
@@ -70,11 +70,11 @@
   
 - `DatasetRegistry`: 数据集注册中心（单例）
   - 管理所有已注册数据集的元数据
-  - 关键方法: `register()`, `get()`, `list_datasets()`
+  - 关键方法: `register()`, `get()`, `list_datasets()`, `update()`, `clear()`
   
 - `DynamicImporter`: 动态导入器
   - 根据模块路径动态导入类
-  - 关键方法: `import_class()`, `create_instance()`
+  - 关键方法: `import_class()`, `create_instance()`, `clear_cache()`
   - 类级缓存机制，避免重复导入
   
 - `DatasetFactory`: 数据集工厂
@@ -98,6 +98,14 @@
 - `cifar10/`: CIFAR-10 彩色图像
 - `fashion_mnist/`: Fashion-MNIST 时尚物品
 
+**数据集工具函数** (`datasets/__init__.py`):
+- `get_dataset_module()`: 获取数据集模块
+- `list_available_datasets()`: 列出可用数据集
+- `get_raw_dataset_class()`: 获取原始数据集类
+- `get_preprocessor_class()`: 获取预处理器类
+- `get_partitioner_class()`: 获取划分器类
+- `get_dataset_info()`: 获取数据集信息
+
 **修改建议**:
 - 添加新数据集时，遵循现有目录结构
 - 数据集特定常量（如 mean/std）在 preprocessor 中定义
@@ -110,6 +118,11 @@
 - `DatasetConfig`: 数据集配置数据类
 - `DEFAULT_DATASET_CONFIGS`: 默认数据集配置字典
 - `DEFAULT_PARTITION_CONFIGS`: 默认划分策略配置
+
+**辅助函数**:
+- `get_dataset_config()`: 获取数据集配置
+- `get_partition_config()`: 获取划分策略配置
+- `build_config()`: 构建完整配置
 
 **修改建议**:
 - 添加新数据集时，需在 `DEFAULT_DATASET_CONFIGS` 中添加配置
@@ -142,17 +155,49 @@
 2. 实现 `raw.py`:
    ```python
    from core import RawDatasetBase
+   
    class MyDatasetRawDataset(RawDatasetBase):
+       NUM_CLASSES: int = 10
+       NUM_FEATURES: int = 3072
+       INPUT_SHAPE: Tuple[int, ...] = (3, 32, 32)
+       TRAIN_SAMPLES: int = 50000
+       TEST_SAMPLES: int = 10000
+       
        @property
        def num_classes(self) -> int:
-           return 10
-       # ... 实现其他抽象方法
+           return self.NUM_CLASSES
+       
+       @property
+       def num_features(self) -> int:
+           return self.NUM_FEATURES
+       
+       @property
+       def input_shape(self) -> Tuple[int, ...]:
+           return self.INPUT_SHAPE
+       
+       @property
+       def train_samples(self) -> int:
+           return self.TRAIN_SAMPLES
+       
+       @property
+       def test_samples(self) -> int:
+           return self.TEST_SAMPLES
+       
+       def download(self) -> None: ...
+       def load_train_data(self) -> Dataset: ...
+       def load_test_data(self) -> Dataset: ...
    ```
 3. 实现 `preprocess.py`:
    ```python
    from core import PreprocessorBase
+   
    class MyDatasetPreprocessor(PreprocessorBase):
-       # ... 实现数据特定预处理
+       MEAN: List[float] = [0.5, 0.5, 0.5]
+       STD: List[float] = [0.5, 0.5, 0.5]
+       
+       def fit(self, dataset: Dataset) -> "MyDatasetPreprocessor": ...
+       def get_train_transform(self) -> Callable: ...
+       def get_test_transform(self) -> Callable: ...
    ```
 4. 实现 `partition.py`:
    ```python
@@ -210,7 +255,22 @@ manager = MNISTFederatedManager(
     seed=42
 )
 manager.prepare_data()
+
+# 获取客户端数据加载器
 loader = manager.get_client_loader(0, batch_size=32)
+
+# 获取测试数据加载器
+test_loader = manager.get_test_loader(batch_size=256)
+
+# 获取划分统计信息
+partition_info = manager.get_partition_info()
+print(partition_info["statistics"])
+
+# 保存划分结果
+manager.save_split("./splits/mnist_split.json")
+
+# 加载划分结果
+manager.load_split("./splits/mnist_split.json")
 ```
 
 ### 任务3: 添加新划分策略
@@ -238,6 +298,7 @@ loader = manager.get_client_loader(0, batch_size=32)
 - [ ] `load_train_data()` 和 `load_test_data()` 是否返回 PyTorch Dataset
 - [ ] 数据路径是否正确处理
 - [ ] 检查 `data_root` 参数传递
+- [ ] 检查 `num_features` 和 `test_samples` 属性是否实现
 
 ## 🚨 注意事项
 
@@ -248,6 +309,7 @@ loader = manager.get_client_loader(0, batch_size=32)
 3. **模块路径**: 配置中的模块路径必须正确，否则动态导入会失败
 4. **单例模式**: `DatasetRegistry` 是单例，注意状态管理
 5. **划分器基类已实现**: `IIDPartitioner`、`DirichletPartitioner`、`PathologicalPartitioner` 已实现完整逻辑，子类只需重写 `name` 属性
+6. **RawDatasetBase 属性**: 必须实现 `num_classes`, `num_features`, `input_shape`, `train_samples`, `test_samples`
 
 ### 常见陷阱
 
@@ -256,6 +318,7 @@ loader = manager.get_client_loader(0, batch_size=32)
 3. **状态管理**: 预处理器的状态（如 mean/std）需要正确处理
 4. **随机种子**: 划分操作需要设置随机种子以保证可复现性
 5. **懒加载**: `FederatedDatasetManager` 使用懒加载模式，首次调用数据访问方法时才真正准备数据
+6. **input_shape 格式**: 使用 PyTorch 格式 (C, H, W)，而非 TensorFlow 格式 (H, W, C)
 
 ### 测试建议
 
@@ -265,6 +328,7 @@ loader = manager.get_client_loader(0, batch_size=32)
   - 预处理变换是否工作
   - 划分结果是否符合预期
   - 客户端数据加载器是否能正常迭代
+  - 测试数据加载器是否能正常迭代
 - 测试划分器：
   - 验证划分结果格式 `{client_id: [indices]}`
   - 检查划分统计信息
@@ -274,13 +338,21 @@ loader = manager.get_client_loader(0, batch_size=32)
 
 | 任务 | 相关文件 |
 |------|----------|
-| 添加数据集 | `datasets/new_dataset/`, `configs/default_configs.py` |
+| 添加数据集 | `datasets/new_dataset/`, `configs/default_configs.py`, `datasets/__init__.py` |
 | 修改划分策略 | `core/partitioner_base.py`, `datasets/*/partition.py` |
 | 修改预处理 | `datasets/*/preprocess.py` |
 | 修改注册逻辑 | `database/dataset_registry.py`, `database/dynamic_importer.py` |
 | 修改配置系统 | `configs/default_configs.py` |
-| 添加工具函数 | `utils/helpers.py` |
+| 添加工具函数 | `utils/helpers.py`, `utils/__init__.py` |
 | 使用管理器 | `core/dataset_manager_base.py` |
+
+## 📚 子模块文档
+
+- [core/AGENTS.md](./core/AGENTS.md) - Core 模块详细指引
+- [database/AGENTS.md](./database/AGENTS.md) - Database 模块详细指引
+- [datasets/AGENTS.md](./datasets/AGENTS.md) - Datasets 模块详细指引
+- [configs/AGENTS.md](./configs/AGENTS.md) - Configs 模块详细指引
+- [utils/AGENTS.md](./utils/AGENTS.md) - Utils 模块详细指引
 
 ## 📝 代码风格
 

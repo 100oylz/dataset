@@ -16,6 +16,7 @@
 - **联邦学习优化**: 专为联邦学习场景设计，支持客户端数据管理和分布统计
 - **懒加载模式**: `FederatedDatasetManager` 支持按需数据准备，提高启动速度
 - **划分持久化**: 支持划分结果的保存和加载，确保实验可复现
+- **完整的数据访问**: 同时支持客户端训练数据加载器和全局测试数据加载器
 
 ## 📁 项目结构
 
@@ -40,7 +41,8 @@
 ├── datasets/                   # 数据集实现模块
 │   ├── mnist/                  # MNIST数据集
 │   ├── cifar10/                # CIFAR-10数据集
-│   └── fashion_mnist/          # Fashion-MNIST数据集
+│   ├── fashion_mnist/          # Fashion-MNIST数据集
+│   └── __init__.py             # 导出数据集类和辅助函数
 │
 ├── configs/                    # 配置模块
 │   └── default_configs.py      # 默认配置
@@ -123,8 +125,11 @@ manager = MNISTFederatedManager(
 # 准备数据（懒加载：第一次访问时才真正准备）
 manager.prepare_data()
 
-# 获取客户端数据加载器
+# 获取客户端数据加载器（用于训练）
 loader = manager.get_client_loader(0, batch_size=32)
+
+# 获取测试数据加载器（用于全局评估）
+test_loader = manager.get_test_loader(batch_size=256)
 
 # 获取划分统计信息
 partition_info = manager.get_partition_info()
@@ -132,6 +137,9 @@ print(partition_info["statistics"])
 
 # 保存划分结果
 manager.save_split("./splits/mnist_split.json")
+
+# 加载划分结果
+manager.load_split("./splits/mnist_split.json")
 ```
 
 #### 方式3：通过工厂动态创建
@@ -160,13 +168,40 @@ manager.prepare_data()
 loader = manager.get_client_loader(0, batch_size=32)
 ```
 
+#### 方式4：使用数据集工具函数
+
+```python
+from datasets import (
+    list_available_datasets,
+    get_dataset_info,
+    get_raw_dataset_class,
+    get_preprocessor_class,
+    get_partitioner_class,
+)
+
+# 列出所有可用数据集
+datasets = list_available_datasets()
+print(datasets)  # ['mnist', 'cifar10', 'fashion_mnist']
+
+# 获取数据集信息
+info = get_dataset_info("mnist")
+print(info["num_classes"])      # 10
+print(info["train_samples"])    # 60000
+print(info["input_shape"])      # (1, 28, 28)
+
+# 获取数据集类
+RawDatasetClass = get_raw_dataset_class("mnist")
+PreprocessorClass = get_preprocessor_class("mnist")
+PartitionerClass = get_partitioner_class("mnist")
+```
+
 ## 📊 支持的数据集
 
-| 数据集 | 类别数 | 训练样本 | 测试样本 | 输入尺寸 |
-|--------|--------|----------|----------|----------|
-| MNIST | 10 | 60,000 | 10,000 | 1×28×28 |
-| CIFAR-10 | 10 | 50,000 | 10,000 | 3×32×32 |
-| Fashion-MNIST | 10 | 60,000 | 10,000 | 1×28×28 |
+| 数据集 | 类别数 | 训练样本 | 测试样本 | 输入尺寸 | 数据类型 |
+|--------|--------|----------|----------|----------|----------|
+| MNIST | 10 | 60,000 | 10,000 | 1×28×28 | 图像 |
+| CIFAR-10 | 10 | 50,000 | 10,000 | 3×32×32 | 图像 |
+| Fashion-MNIST | 10 | 60,000 | 10,000 | 1×28×28 | 图像 |
 
 ## 🔀 支持的划分策略
 
@@ -197,6 +232,7 @@ client_indices = pathological_partitioner.partition(dataset)
 stats = dirichlet_partitioner.get_statistics(dataset, client_indices)
 print(stats["samples_per_client"])  # 每个客户端的样本数
 print(stats["distribution"])        # 每个客户端的类别分布
+print(stats["statistics"])          # 详细统计信息（均值、标准差、不平衡比例等）
 
 # 保存划分结果
 dirichlet_partitioner.save_partition(client_indices, "./split.json")
@@ -221,8 +257,12 @@ loaded_indices = dirichlet_partitioner.load_partition("./split.json")
 
 1. 创建数据集目录：`mkdir datasets/my_dataset`
 2. 实现原始数据集类（继承 `RawDatasetBase`）
+   - 实现 `num_classes`, `num_features`, `input_shape`, `train_samples`, `test_samples` 属性
+   - 实现 `download()`, `load_train_data()`, `load_test_data()` 方法
 3. 实现预处理器类（继承 `PreprocessorBase`）
+   - 实现 `fit()`, `get_train_transform()`, `get_test_transform()` 方法
 4. 实现划分器类（继承 `IIDPartitioner`、`DirichletPartitioner` 或 `PathologicalPartitioner`）
+   - 重写 `name` 属性
 5. 在 `__init__.py` 中导出组件
 6. 在 `configs/default_configs.py` 中添加配置
 7. 注册到数据库（可选）
