@@ -1,0 +1,48 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: fl_dataset_mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-fl_dataset_db}
+      MYSQL_USER: ${MYSQL_USER:-fl_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-flpassword}
+    ports:
+      - "${MYSQL_PORT:-3306}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./database/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - fl_dataset_network
+
+  # 可选：Adminer 数据库管理工具
+  adminer:
+    image: adminer:latest
+    container_name: fl_dataset_adminer
+    restart: unless-stopped
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - fl_dataset_network
+    profiles:
+      - admin
+
+volumes:
+  mysql_data:
+    driver: local
+
+networks:
+  fl_dataset_network:
+    driver: bridge
