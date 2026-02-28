@@ -23,6 +23,7 @@ from .mnist import (
     MNISTIIDPartitioner,
     MNISTDirichletPartitioner,
     MNISTPathologicalPartitioner,
+    MNISTFederatedManager,
 )
 
 # CIFAR-10
@@ -33,6 +34,7 @@ from .cifar10 import (
     CIFAR10IIDPartitioner,
     CIFAR10DirichletPartitioner,
     CIFAR10PathologicalPartitioner,
+    CIFAR10FederatedManager,
 )
 
 # Fashion-MNIST
@@ -43,6 +45,7 @@ from .fashion_mnist import (
     FashionMNISTIIDPartitioner,
     FashionMNISTDirichletPartitioner,
     FashionMNISTPathologicalPartitioner,
+    FashionMNISTFederatedManager,
 )
 
 __all__ = [
@@ -53,6 +56,7 @@ __all__ = [
     "MNISTIIDPartitioner",
     "MNISTDirichletPartitioner",
     "MNISTPathologicalPartitioner",
+    "MNISTFederatedManager",
     # CIFAR-10
     "CIFAR10RawDataset",
     "CIFAR10Preprocessor",
@@ -60,6 +64,7 @@ __all__ = [
     "CIFAR10IIDPartitioner",
     "CIFAR10DirichletPartitioner",
     "CIFAR10PathologicalPartitioner",
+    "CIFAR10FederatedManager",
     # Fashion-MNIST
     "FashionMNISTRawDataset",
     "FashionMNISTPreprocessor",
@@ -67,12 +72,15 @@ __all__ = [
     "FashionMNISTIIDPartitioner",
     "FashionMNISTDirichletPartitioner",
     "FashionMNISTPathologicalPartitioner",
+    "FashionMNISTFederatedManager",
     # 辅助函数
     "get_dataset_module",
     "list_available_datasets",
     "get_raw_dataset_class",
     "get_preprocessor_class",
     "get_partitioner_class",
+    "get_federated_manager_class",
+    "create_federated_manager",
 ]
 
 # 数据集注册表
@@ -81,18 +89,21 @@ _DATASET_REGISTRY = {
         "raw": MNISTRawDataset,
         "preprocessor": MNISTPreprocessor,
         "partitioner": MNISTPartitioner,
+        "manager": MNISTFederatedManager,
         "module": "datasets.mnist",
     },
     "cifar10": {
         "raw": CIFAR10RawDataset,
         "preprocessor": CIFAR10Preprocessor,
         "partitioner": CIFAR10Partitioner,
+        "manager": CIFAR10FederatedManager,
         "module": "datasets.cifar10",
     },
     "fashion_mnist": {
         "raw": FashionMNISTRawDataset,
         "preprocessor": FashionMNISTPreprocessor,
         "partitioner": FashionMNISTPartitioner,
+        "manager": FashionMNISTFederatedManager,
         "module": "datasets.fashion_mnist",
     },
 }
@@ -172,6 +183,73 @@ def get_partitioner_class(dataset_name: str) -> Optional[Any]:
     if dataset_name in _DATASET_REGISTRY:
         return _DATASET_REGISTRY[dataset_name]["partitioner"]
     return None
+
+
+def get_federated_manager_class(dataset_name: str) -> Optional[Any]:
+    """
+    获取联邦学习管理器类
+    
+    Args:
+        dataset_name: 数据集名称
+        
+    Returns:
+        联邦学习管理器类，如果不存在则返回None
+    """
+    dataset_name = dataset_name.lower()
+    if dataset_name in _DATASET_REGISTRY:
+        return _DATASET_REGISTRY[dataset_name].get("manager")
+    return None
+
+
+def create_federated_manager(
+    dataset_name: str,
+    data_root: str,
+    num_clients: int,
+    partition_strategy: str = "iid",
+    partition_params: Optional[Dict[str, Any]] = None,
+    seed: int = 42,
+    **kwargs
+) -> Optional[Any]:
+    """
+    创建联邦学习管理器实例
+    
+    便捷函数，用于快速创建指定数据集的联邦学习管理器
+    
+    Args:
+        dataset_name: 数据集名称
+        data_root: 数据根目录
+        num_clients: 客户端数量
+        partition_strategy: 划分策略（iid/dirichlet/pathological）
+        partition_params: 划分策略参数
+        seed: 随机种子
+        **kwargs: 其他参数
+        
+    Returns:
+        联邦学习管理器实例，如果数据集不存在则返回None
+        
+    Example:
+        >>> manager = create_federated_manager(
+        ...     dataset_name="mnist",
+        ...     data_root="./data",
+        ...     num_clients=10,
+        ...     partition_strategy="dirichlet",
+        ...     partition_params={"alpha": 0.5}
+        ... )
+        >>> manager.prepare_data()
+        >>> loader = manager.get_client_loader(0, batch_size=32)
+    """
+    manager_class = get_federated_manager_class(dataset_name)
+    if manager_class is None:
+        return None
+    
+    return manager_class(
+        data_root=data_root,
+        num_clients=num_clients,
+        partition_strategy=partition_strategy,
+        partition_params=partition_params or {},
+        seed=seed,
+        **kwargs
+    )
 
 
 def get_dataset_info(dataset_name: str) -> Optional[Dict[str, Any]]:
