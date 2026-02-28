@@ -9,10 +9,10 @@ torchvision = ">=0.10.0"
 numpy = ">=1.19.0"
 pillow = "*"
 opencv-python = "*"
-pymysql = "*"
 matplotlib = "*"
 pandas = "*"
 seaborn = "*"
+pymysql = {extras = ["rsa"], version = "*"}
 
 [dev-packages]
 
