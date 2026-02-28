@@ -346,7 +346,6 @@ class FederatedDatasetManager(DatasetManagerBase):
         # 1. 创建并下载原始数据集
         self._raw_dataset = self.raw_dataset_class(
             data_root=self._data_root,
-            dataset_name=self.dataset_name,
             **self._kwargs
         )
         
@@ -356,7 +355,7 @@ class FederatedDatasetManager(DatasetManagerBase):
         # 2. 加载原始数据
         raw_train_data = self._raw_dataset.load_train_data()
         raw_test_data = self._raw_dataset.load_test_data()
-        
+
         # 3. 创建并拟合预处理器
         self._preprocessor = self.preprocessor_class(
             dataset_name=self.dataset_name,
@@ -371,13 +370,24 @@ class FederatedDatasetManager(DatasetManagerBase):
         # 实际实现可能需要根据具体情况调整
         self._train_dataset = self._apply_transform(raw_train_data, self._preprocessor.get_train_transform())
         self._test_dataset = self._apply_transform(raw_test_data, self._preprocessor.get_test_transform())
-        
+
         # 5. 创建划分器并执行划分
-        self._partitioner = self.partitioner_class(
-            num_clients=self._num_clients,
-            seed=self._seed,
-            **self._partition_params
-        )
+        # 支持工厂类模式（如果有create方法）或直接实例化
+        if hasattr(self.partitioner_class, 'create'):
+            # 工厂类模式
+            self._partitioner = self.partitioner_class.create(
+                strategy=self._partition_strategy,
+                num_clients=self._num_clients,
+                seed=self._seed,
+                **self._partition_params
+            )
+        else:
+            # 直接实例化模式
+            self._partitioner = self.partitioner_class(
+                num_clients=self._num_clients,
+                seed=self._seed,
+                **self._partition_params
+            )
         
         self._client_indices = self._partitioner.partition(self._train_dataset)
         
