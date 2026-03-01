@@ -59,6 +59,7 @@
 - 修改基类会影响所有数据集实现，需谨慎
 - 添加新的划分策略类型时，在此定义抽象接口
 - `FederatedDatasetManager` 已实现所有抽象方法，子类只需指定类属性
+- **新增**: `visualize_client_distribution()` 方法可直接生成分布图
 
 ### 2. Database 模块 (`database/`)
 **定位**: 数据注册和动态导入
@@ -271,6 +272,16 @@ manager.save_split("./splits/mnist_split.json")
 
 # 加载划分结果
 manager.load_split("./splits/mnist_split.json")
+
+# 可视化客户端类别分布
+manager.visualize_client_distribution(
+    title="MNIST Distribution",
+    save_path="./results/dist.png",  # None则直接显示
+    figsize=(12, 5),
+    cmap="viridis",
+    max_clients=10,   # 最多显示10个客户端
+    max_classes=10    # 最多显示10个类别
+)
 ```
 
 ### 任务3: 添加新划分策略
@@ -291,7 +302,39 @@ manager.load_split("./splits/mnist_split.json")
 3. 注意保持 `get_train_transform()` 和 `get_test_transform()` 接口一致
 4. 如需添加新参数，更新配置和构造函数
 
-### 任务5: 修复数据加载问题
+### 任务5: 生成客户端类别分布图
+
+**使用方式**:
+```python
+# 方法1: 保存为图片
+manager.visualize_client_distribution(
+    title="MNIST Distribution",
+    save_path="./results/dist.png"
+)
+
+# 方法2: 直接显示
+manager.visualize_client_distribution()
+
+# 方法3: 自定义参数
+manager.visualize_client_distribution(
+    title="Custom Title",
+    figsize=(14, 6),      # 图像尺寸
+    cmap="tab10",          # 颜色映射
+    max_clients=5,         # 最多显示5个客户端
+    max_classes=10         # 最多显示10个类别
+)
+```
+
+**图表说明**:
+- 左图（堆叠柱状图）：显示每个客户端各类别的样本数量
+- 右图（热力图）：显示每个客户端各类别的比例（越红表示比例越高）
+
+**适用场景**:
+- 验证 Non-IID 划分效果
+- 比较不同划分策略（IID vs Dirichlet vs Pathological）
+- 论文/报告中的数据分布可视化
+
+### 任务6: 修复数据加载问题
 
 **检查清单**:
 - [ ] `raw.py` 中的 `download()` 是否正确实现

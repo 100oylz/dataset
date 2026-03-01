@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from core.raw_dataset_base import RawDatasetBase
 from core.preprocessor_base import PreprocessorBase
 from core.partitioner_base import PartitionerBase
-from utils.helpers import set_seed, save_json, load_json
+from utils.helpers import set_seed, save_json, load_json, visualize_distribution
 
 
 class DatasetManagerBase(ABC):
@@ -616,3 +616,57 @@ class FederatedDatasetManager(DatasetManagerBase):
                 f"Loaded split has {len(self._client_indices)} clients, "
                 f"but expected {self._num_clients}"
             )
+    
+    def visualize_client_distribution(
+        self,
+        title: Optional[str] = None,
+        save_path: Optional[str] = None,
+        figsize: tuple = (12, 5),
+        cmap: str = "viridis",
+        max_clients: int = 10,
+        max_classes: int = 10
+    ) -> None:
+        """
+        可视化客户端数据分布（类别分布图）
+        
+        生成两个图表：
+        1. 左侧：堆叠柱状图 - 显示每个客户端各类别的样本数量
+        2. 右侧：热力图 - 显示每个客户端各类别的比例（归一化）
+        
+        Args:
+            title: 图表标题，默认为 "{dataset_name} Distribution ({strategy})"
+            save_path: 保存路径，None则直接显示
+            figsize: 图像尺寸 (宽, 高)
+            cmap: 颜色映射名称
+            max_clients: 最大显示客户端数（防止过多影响观感）
+            max_classes: 最大显示类别数（防止过多影响观感）
+            
+        Example:
+            >>> manager.visualize_client_distribution()
+            >>> manager.visualize_client_distribution(save_path="./dist.png")
+        """
+        self._ensure_prepared()
+        
+        if self._partitioner is None or self._client_indices is None:
+            raise RuntimeError("Data not prepared properly")
+        
+        # 获取分布数据
+        distribution = self._partitioner.get_distribution(
+            self._train_dataset, 
+            self._client_indices
+        )
+        
+        # 设置默认标题
+        if title is None:
+            title = f"{self.dataset_name.upper()} Distribution ({self._partition_strategy})"
+        
+        # 调用可视化函数
+        visualize_distribution(
+            distribution=distribution,
+            title=title,
+            save_path=save_path,
+            figsize=figsize,
+            cmap=cmap,
+            max_clients=max_clients,
+            max_classes=max_classes
+        )
