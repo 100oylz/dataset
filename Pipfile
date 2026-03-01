@@ -13,6 +13,7 @@ matplotlib = "*"
 pandas = "*"
 seaborn = "*"
 pymysql = {extras = ["rsa"], version = "*"}
+ftfy = "*"
 
 [dev-packages]
 

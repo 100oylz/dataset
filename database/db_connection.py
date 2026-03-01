@@ -115,6 +115,11 @@ class DatabaseConnection:
         try:
             if self._connection is None or not self._connection.open:
                 self._connection = pymysql.connect(**self.config.connection_params)
+                # 设置字符集为 utf8mb4
+                with self._connection.cursor() as cursor:
+                    cursor.execute("SET NAMES utf8mb4")
+                    cursor.execute("SET CHARACTER SET utf8mb4")
+                    self._connection.commit()
                 logger.info(f"数据库连接已建立: {self.config}")
             return self._connection
         except pymysql.Error as e:
