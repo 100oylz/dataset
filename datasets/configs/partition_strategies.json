@@ -1,0 +1,72 @@
+{
+  "strategies": [
+    {
+      "name": "iid",
+      "display_name": "IID 划分",
+      "description": "独立同分布划分，将数据随机均匀分配给所有客户端",
+      "default_params": {},
+      "param_schema": {
+        "type": "object",
+        "properties": {},
+        "description": "IID划分不需要额外参数"
+      },
+      "min_clients": 2,
+      "max_clients": 10000,
+      "supported_datasets": ["mnist", "cifar10", "fashion_mnist", "femnist"],
+      "is_federated": true,
+      "status": "active"
+    },
+    {
+      "name": "dirichlet",
+      "display_name": "Dirichlet 划分",
+      "description": "基于Dirichlet分布的Non-IID划分，控制数据异构程度",
+      "default_params": {
+        "alpha": 0.5
+      },
+      "param_schema": {
+        "type": "object",
+        "properties": {
+          "alpha": {
+            "type": "number",
+            "default": 0.5,
+            "minimum": 0.01,
+            "maximum": 100,
+            "description": "Dirichlet参数，越小越Non-IID"
+          }
+        },
+        "required": ["alpha"]
+      },
+      "min_clients": 2,
+      "max_clients": 10000,
+      "supported_datasets": ["mnist", "cifar10", "fashion_mnist", "femnist"],
+      "is_federated": true,
+      "status": "active"
+    },
+    {
+      "name": "pathological",
+      "display_name": "Pathological 划分",
+      "description": "病态划分，每个客户端只获得特定数量的类别",
+      "default_params": {
+        "shards_per_client": 2
+      },
+      "param_schema": {
+        "type": "object",
+        "properties": {
+          "shards_per_client": {
+            "type": "integer",
+            "default": 2,
+            "minimum": 1,
+            "maximum": 10,
+            "description": "每个客户端的类别数"
+          }
+        },
+        "required": ["shards_per_client"]
+      },
+      "min_clients": 2,
+      "max_clients": 10000,
+      "supported_datasets": ["mnist", "cifar10", "fashion_mnist", "femnist"],
+      "is_federated": true,
+      "status": "active"
+    }
+  ]
+}
