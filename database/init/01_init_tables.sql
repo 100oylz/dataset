@@ -134,26 +134,7 @@ CREATE TABLE IF NOT EXISTS partition_results (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='划分结果存储表';
 
 -- ============================================
--- 数据集使用日志表
+-- 注：dataset_usage_logs 表已删除
+-- 原用于记录数据集使用日志，但当前代码未使用
+-- 如需添加日志功能，请重新创建此表
 -- ============================================
-CREATE TABLE IF NOT EXISTS dataset_usage_logs (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    dataset_name VARCHAR(64) NOT NULL COMMENT '数据集名称',
-    action VARCHAR(64) NOT NULL COMMENT '操作类型（download/partition/train等）',
-    
-    -- 操作详情
-    details JSON COMMENT '操作详情',
-    
-    -- 执行信息
-    executed_by VARCHAR(128) COMMENT '执行者',
-    execution_time_ms INT COMMENT '执行时间（毫秒）',
-    status VARCHAR(32) DEFAULT 'success' COMMENT '状态：success/failed',
-    error_message TEXT COMMENT '错误信息',
-    
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-    
-    -- 索引
-    INDEX idx_dataset_name (dataset_name),
-    INDEX idx_action (action),
-    INDEX idx_created_at (created_at)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='数据集使用日志表';
