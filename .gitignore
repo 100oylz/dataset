@@ -63,3 +63,6 @@ Thumbs.db
 .pytest_cache/
 .coverage
 htmlcov/
+
+# 结果输出目录
+results/
