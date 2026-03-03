@@ -9,11 +9,18 @@ services:
       MYSQL_DATABASE: ${MYSQL_DATABASE:-fl_dataset_db}
       MYSQL_USER: ${MYSQL_USER:-fl_user}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-flpassword}
+      # 设置默认字符集为 UTF-8
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
+    command: >
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
     ports:
       - "${MYSQL_PORT:-3306}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
       - ./database/init:/docker-entrypoint-initdb.d:ro
+      - ./configs/mysql/my.cnf:/etc/mysql/conf.d/utf8mb4.cnf:ro
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
