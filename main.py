@@ -10,17 +10,16 @@ factory = DatasetFactory(registry)
 manager = factory.create(
     dataset_name="mnist",
     data_root="./data",
-    num_clients=10,
+    num_clients=100,
     partition_strategy="dirichlet",
-    partition_params={"alpha": 0.01}
+    partition_params={"alpha": 0.05}
 )
 
 # 准备数据
 manager.prepare_data()
 
 # 获取客户端数据加载器
-loader = manager.get_client_loader(0, batch_size=32)
-
+loader = manager.get_client_loader(0, batch_size=3)
 print(manager.dataset_name)
 print(manager.get_data_info())
 print(manager.get_partition_info())
@@ -37,7 +36,7 @@ print("=" * 50)
 
 # 方式1: 保存为图片文件
 manager.visualize_client_distribution(
-    title="MNIST - Dirichlet Partition (alpha=0.5)",
+    title="MNIST - Dirichlet Partition (alpha=0.05)",
     save_path="./results/client_distribution.png"
 )
 
