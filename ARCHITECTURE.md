@@ -212,19 +212,43 @@ manager.prepare_data()
 loader = manager.get_client_loader(0, batch_size=32)
 ```
 
-### 方式3：直接实例化管理器（待实现）
+### 方式3：使用便捷函数创建管理器
 
 ```python
-# 每个数据集会有一个管理器实现
-from datasets.mnist import MNISTManager
+from datasets import create_federated_manager
 
-manager = MNISTManager(
+# 通过名称快速创建管理器
+manager = create_federated_manager(
+    dataset_name="mnist",
     data_root="./data",
     num_clients=10,
     partition_strategy="dirichlet",
-    partition_params={"alpha": 0.5}
+    partition_params={"alpha": 0.5},
+    seed=42
 )
 manager.prepare_data()
+```
+
+### 方式4：直接实例化具体管理器
+
+```python
+# 每个数据集都有完整的FederatedManager实现
+from datasets.mnist import MNISTFederatedManager
+
+manager = MNISTFederatedManager(
+    data_root="./data",
+    num_clients=10,
+    partition_strategy="dirichlet",
+    partition_params={"alpha": 0.5},
+    seed=42
+)
+manager.prepare_data()
+
+# 可视化客户端分布
+manager.visualize_client_distribution(
+    title="MNIST Client Distribution",
+    save_path="./results/mnist_dist.png"
+)
 ```
 
 ## 添加新数据集的步骤
@@ -285,11 +309,34 @@ manager.prepare_data()
    registry.register(registration)
    ```
 
-## 扩展功能（待实现）
+## 扩展功能
 
-- 支持更多数据集（ImageNet, CIFAR-100等）
-- 支持文本数据集
-- 支持音频数据集
-- 实现具体的数据集管理器类
-- 添加可视化工具
-- 添加数据统计分析工具
+- [x] 支持更多数据集（FEMNIST已添加）
+- [ ] 支持文本数据集
+- [ ] 支持音频数据集
+- [x] 实现具体的数据集管理器类（FederatedDatasetManager）
+- [x] 添加可视化工具（visualize_client_distribution）
+- [x] 添加数据统计分析工具（get_partition_info, get_statistics）
+
+## 特性说明
+
+### 懒加载模式
+`FederatedDatasetManager` 支持懒加载，首次调用数据访问方法时才真正准备数据，提高启动速度。
+
+### 划分结果持久化
+支持划分结果的保存和加载，确保实验可复现：
+```python
+manager.save_split("./splits/mnist_split.json")
+manager.load_split("./splits/mnist_split.json")
+```
+
+### 客户端分布可视化
+```python
+manager.visualize_client_distribution(
+    title="Client Distribution",
+    save_path="./results/dist.png",  # None则直接显示
+    figsize=(12, 5),
+    max_clients=10,
+    max_classes=10
+)
+```
