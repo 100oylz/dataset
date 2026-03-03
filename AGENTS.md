@@ -95,9 +95,12 @@
 - `partition.py`: 划分器类（继承 `PartitionerBase` 的子类）
 
 **现有数据集**:
-- `mnist/`: MNIST 手写数字
-- `cifar10/`: CIFAR-10 彩色图像
-- `fashion_mnist/`: Fashion-MNIST 时尚物品
+- `mnist/`: MNIST 手写数字（10类，60k训练/10k测试）
+- `cifar10/`: CIFAR-10 彩色图像（10类，50k训练/10k测试）
+- `fashion_mnist/`: Fashion-MNIST 时尚物品（10类，60k训练/10k测试）
+- `femnist/`: FEMNIST 联邦学习扩展MNIST（62类，697k训练/116k测试）
+  - 包含大小写字母和数字
+  - 适合大规模联邦学习场景
 
 **数据集工具函数** (`datasets/__init__.py`):
 - `get_dataset_module()`: 获取数据集模块
@@ -105,6 +108,8 @@
 - `get_raw_dataset_class()`: 获取原始数据集类
 - `get_preprocessor_class()`: 获取预处理器类
 - `get_partitioner_class()`: 获取划分器类
+- `get_federated_manager_class()`: 获取联邦管理器类
+- `create_federated_manager()`: 创建联邦管理器实例（便捷函数）
 - `get_dataset_info()`: 获取数据集信息
 
 **修改建议**:
