@@ -16,6 +16,7 @@ python tests/test_download.py
 python tests/test_download.py --dataset mnist
 python tests/test_download.py --dataset cifar10
 python tests/test_download.py --dataset fashion_mnist
+python tests/test_download.py --dataset femnist
 
 # 指定数据目录
 python tests/test_download.py --data-root /path/to/data
@@ -120,6 +121,7 @@ manager = ManagerClass(
 - **MNIST**: `torchvision.datasets.MNIST`
 - **CIFAR-10**: `torchvision.datasets.CIFAR10`
 - **Fashion-MNIST**: `torchvision.datasets.FashionMNIST`
+- **FEMNIST**: `torchvision.datasets.EMNIST` (split='byclass')
 
 数据将自动下载到指定的 `data_root` 目录。
 
@@ -139,8 +141,13 @@ datasets/
 │   ├── raw.py
 │   ├── preprocess.py
 │   └── partition.py
-└── fashion_mnist/
-    ├── __init__.py          # 导出 FashionMNISTFederatedManager
+├── fashion_mnist/
+│   ├── __init__.py          # 导出 FashionMNISTFederatedManager
+│   ├── raw.py
+│   ├── preprocess.py
+│   └── partition.py
+└── femnist/
+    ├── __init__.py          # 导出 FEMNISTFederatedManager
     ├── raw.py
     ├── preprocess.py
     └── partition.py
@@ -151,3 +158,36 @@ datasets/
 - `get_federated_manager_class()` - 获取Manager类
 - `list_available_datasets()` - 列出可用数据集
 - `get_dataset_info()` - 获取数据集信息
+
+## 可视化客户端分布
+
+每个Manager都支持可视化客户端类别分布：
+
+```python
+from datasets import create_federated_manager
+
+manager = create_federated_manager(
+    dataset_name="mnist",
+    data_root="./data",
+    num_clients=10,
+    partition_strategy="dirichlet",
+    partition_params={"alpha": 0.5},
+    seed=42
+)
+manager.prepare_data()
+
+# 可视化并保存
+manager.visualize_client_distribution(
+    title="MNIST Client Distribution",
+    save_path="./results/mnist_dist.png"
+)
+
+# 直接显示
+manager.visualize_client_distribution(
+    title="MNIST Client Distribution"
+)
+```
+
+可视化功能会生成两个图表：
+- **左图**: 堆叠柱状图 - 显示每个客户端各类别的样本数量
+- **右图**: 热力图 - 显示每个客户端各类别的比例（越红表示比例越高）
