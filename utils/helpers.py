@@ -240,7 +240,7 @@ def visualize_distribution(
     if len(df) > max_clients:
         top_clients = df.sum(axis=1).nlargest(max_clients).index
         df = df.loc[top_clients]
-        truncation_info.append(f"显示样本量最多的前{max_clients}个客户端(共{original_shape[0]}个)")
+        truncation_info.append(f"Top {max_clients} clients by sample count (of {original_shape[0]} total)")
     
     # 限制类别数量：选择全局出现频率最高的前N个类别
     if len(df.columns) > max_classes:
@@ -250,14 +250,14 @@ def visualize_distribution(
         if other_cols:
             df['Others'] = df[other_cols].sum(axis=1)
             df = df[list(top_classes) + ['Others']]
-            truncation_info.append(f"显示频率最高的前{max_classes}个类别(共{original_shape[1]}个)")
+            truncation_info.append(f"Top {max_classes} classes by frequency (of {original_shape[1]} total)")
     else:
         top_classes = df.columns
     
     # 如果有截断，添加警告并在标题中注明
     if truncation_info:
         warn_msg = "; ".join(truncation_info)
-        warnings.warn(f"数据量过大已截断: {warn_msg}", UserWarning)
+        warnings.warn(f"Data truncated: {warn_msg}", UserWarning)
         title = f"{title}\n(Truncated: {warn_msg})"
     
     # 调整图像大小：根据实际显示的数据量动态调整
