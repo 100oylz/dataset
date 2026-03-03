@@ -24,11 +24,17 @@ datasets/
 │   ├── preprocess.py        # CIFAR10Preprocessor
 │   └── partition.py         # CIFAR10Partitioner
 │
-└── fashion_mnist/           # Fashion-MNIST 数据集
-    ├── __init__.py          # 导出 Fashion-MNIST 组件
-    ├── raw.py               # FashionMNISTRawDataset
-    ├── preprocess.py        # FashionMNISTPreprocessor
-    └── partition.py         # FashionMNISTPartitioner
+├── fashion_mnist/           # Fashion-MNIST 数据集
+│   ├── __init__.py          # 导出 Fashion-MNIST 组件
+│   ├── raw.py               # FashionMNISTRawDataset
+│   ├── preprocess.py        # FashionMNISTPreprocessor
+│   └── partition.py         # FashionMNISTPartitioner
+│
+└── femnist/                 # FEMNIST 数据集
+    ├── __init__.py          # 导出 FEMNIST 组件
+    ├── raw.py               # FEMNISTRawDataset
+    ├── preprocess.py        # FEMNISTPreprocessor
+    └── partition.py         # FEMNISTPartitioner
 ```
 
 ## 每个数据集的标准结构
@@ -169,6 +175,55 @@ preprocessor = FashionMNISTPreprocessor()
 partitioner = FashionMNISTPartitioner.create("dirichlet", num_clients=10, alpha=0.5)
 ```
 
+### 4. FEMNIST
+
+**描述**: 联邦学习扩展 MNIST（Federated Extended MNIST）
+
+**基本信息**:
+- 类别数: 62
+  - 10 个数字 (0-9)
+  - 26 个大写字母 (A-Z)
+  - 26 个小写字母 (a-z)
+- 训练样本: 697,932
+- 测试样本: 116,323
+- 图像尺寸: 28×28 灰度
+- 输入形状: (1, 28, 28)
+
+**预处理器**:
+- 均值: [0.1733]
+- 标准差: [0.3310]
+
+**使用示例**:
+```python
+from datasets.femnist import (
+    FEMNISTRawDataset,
+    FEMNISTPreprocessor,
+    FEMNISTPartitioner,
+    FEMNISTFederatedManager
+)
+
+# 方式1: 使用联邦管理器（推荐）
+manager = FEMNISTFederatedManager(
+    data_root="./data",
+    num_clients=100,
+    partition_strategy="dirichlet",
+    partition_params={"alpha": 0.1},
+    seed=42
+)
+manager.prepare_data()
+
+# 方式2: 使用组件
+raw = FEMNISTRawDataset(data_root="./data")
+raw.download()
+preprocessor = FEMNISTPreprocessor()
+partitioner = FEMNISTPartitioner.create("dirichlet", num_clients=100, alpha=0.1)
+```
+
+**适用场景**:
+- 大规模联邦学习实验（支持更多客户端）
+- 需要更多类别（62类）的分类任务
+- 研究字母数字混合识别
+
 ## 快速对比
 
 | 数据集 | 类别数 | 训练样本 | 测试样本 | 图像尺寸 | 通道数 |
@@ -176,6 +231,7 @@ partitioner = FashionMNISTPartitioner.create("dirichlet", num_clients=10, alpha=
 | MNIST | 10 | 60,000 | 10,000 | 28×28 | 1 |
 | CIFAR-10 | 10 | 50,000 | 10,000 | 32×32 | 3 |
 | Fashion-MNIST | 10 | 60,000 | 10,000 | 28×28 | 1 |
+| FEMNIST | 62 | 697,932 | 116,323 | 28×28 | 1 |
 
 ## 统一使用方式
 
@@ -202,7 +258,7 @@ from datasets import MNISTRawDataset, CIFAR10RawDataset
 
 # 获取数据集列表
 from datasets import list_available_datasets
-print(list_available_datasets())  # ['mnist', 'cifar10', 'fashion_mnist']
+print(list_available_datasets())  # ['mnist', 'cifar10', 'fashion_mnist', 'femnist']
 ```
 
 ## 添加新数据集

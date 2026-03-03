@@ -5,6 +5,7 @@
 - mnist: MNIST数据集
 - cifar10: CIFAR-10数据集
 - fashion_mnist: Fashion-MNIST数据集
+- femnist: FEMNIST数据集（联邦学习扩展MNIST，62个类别）
 
 每个数据集包含：
 - raw: 原始数据集类
@@ -48,6 +49,25 @@ from .fashion_mnist import (
     FashionMNISTFederatedManager,
 )
 
+# FEMNIST
+from .femnist import (
+    FEMNISTRawDataset,
+    FEMNISTPreprocessor,
+    FEMNISTPartitioner,
+    FEMNISTIIDPartitioner,
+    FEMNISTDirichletPartitioner,
+    FEMNISTPathologicalPartitioner,
+    FEMNISTFederatedManager,
+)
+
+# 数据集注册导入功能
+from .registry import (
+    DatasetRegistryImporter,
+    register_all,
+    register_datasets,
+    register_strategies,
+)
+
 __all__ = [
     # MNIST
     "MNISTRawDataset",
@@ -73,6 +93,14 @@ __all__ = [
     "FashionMNISTDirichletPartitioner",
     "FashionMNISTPathologicalPartitioner",
     "FashionMNISTFederatedManager",
+    # FEMNIST
+    "FEMNISTRawDataset",
+    "FEMNISTPreprocessor",
+    "FEMNISTPartitioner",
+    "FEMNISTIIDPartitioner",
+    "FEMNISTDirichletPartitioner",
+    "FEMNISTPathologicalPartitioner",
+    "FEMNISTFederatedManager",
     # 辅助函数
     "get_dataset_module",
     "list_available_datasets",
@@ -81,6 +109,11 @@ __all__ = [
     "get_partitioner_class",
     "get_federated_manager_class",
     "create_federated_manager",
+    # 数据集注册导入功能
+    "DatasetRegistryImporter",
+    "register_all",
+    "register_datasets",
+    "register_strategies",
 ]
 
 # 数据集注册表
@@ -105,6 +138,13 @@ _DATASET_REGISTRY = {
         "partitioner": FashionMNISTPartitioner,
         "manager": FashionMNISTFederatedManager,
         "module": "datasets.fashion_mnist",
+    },
+    "femnist": {
+        "raw": FEMNISTRawDataset,
+        "preprocessor": FEMNISTPreprocessor,
+        "partitioner": FEMNISTPartitioner,
+        "manager": FEMNISTFederatedManager,
+        "module": "datasets.femnist",
     },
 }
 
