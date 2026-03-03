@@ -204,9 +204,6 @@ saved_result = result_registry.get(
 ### partition_results
 存储划分结果（用于缓存）
 
-### dataset_usage_logs
-存储数据集使用日志
-
 ## 故障排除
 
 ### 连接失败
@@ -232,3 +229,39 @@ docker-compose restart mysql
 docker-compose exec mysql mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "source /docker-entrypoint-initdb.d/01_init_tables.sql"
 docker-compose exec mysql mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "source /docker-entrypoint-initdb.d/02_seed_data.sql"
 ```
+
+## 数据库检查工具
+
+项目提供了数据库检查工具 `scripts/check_database.py`，用于诊断和修复数据库问题：
+
+```bash
+# 检查数据库表结构和内容
+python scripts/check_database.py
+
+# 修复中文乱码问题（使用 ftfy 库）
+python scripts/check_database.py --fix-mojibake
+
+# 显示帮助
+python scripts/check_database.py --help
+```
+
+### 功能说明
+
+- **表结构检查**: 验证所有必需的表是否存在
+- **数据集记录检查**: 显示数据集注册信息
+- **划分策略检查**: 显示支持的划分策略
+- **乱码修复**: 自动检测并修复数据库中的 mojibake 乱码
+
+### 中文乱码问题
+
+如果遇到中文显示乱码，可以使用 `--fix-mojibake` 选项修复：
+
+```bash
+python scripts/check_database.py --fix-mojibake
+```
+
+修复过程会：
+1. 扫描所有可能包含乱码的字段
+2. 使用 ftfy 库尝试修复乱码
+3. 显示修复前后的对比
+4. 将修复后的内容更新到数据库
