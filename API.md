@@ -6,10 +6,13 @@
 
 - [1. 快速开始](#1-快速开始)
 - [2. 数据集管理器 API](#2-数据集管理器-api)
-- [3. 工具函数 API](#3-工具函数-api)
-- [4. 配置 API](#4-配置-api)
-- [5. 数据集信息](#5-数据集信息)
-- [6. 完整示例](#6-完整示例)
+- [3. 数据库 API](#3-数据库-api)
+- [4. 动态导入 API](#4-动态导入-api)
+- [5. 基类 API](#5-基类-api)
+- [6. 工具函数 API](#6-工具函数-api)
+- [7. 配置 API](#7-配置-api)
+- [8. 数据集信息](#8-数据集信息)
+- [9. 完整示例](#9-完整示例)
 
 ---
 
@@ -45,7 +48,22 @@ manager = MNISTFederatedManager(
 )
 ```
 
-### 1.3 常用工作流
+### 1.3 通过数据库工厂创建
+
+```python
+from database import DatasetFactory
+
+factory = DatasetFactory()
+manager = factory.create(
+    dataset_name="mnist",
+    data_root="./data",
+    num_clients=10,
+    partition_strategy="dirichlet",
+    partition_params={"alpha": 0.5}
+)
+```
+
+### 1.4 常用工作流
 
 ```python
 # 1. 创建管理器
@@ -142,7 +160,12 @@ FederatedDatasetManager(
     "strategy_type": "non-iid",
     "statistics": {
         "client_samples": {0: 6001, 1: 5998, ...},  # 各客户端样本数
-        "class_distribution": {0: {0: 123, 1: 456, ...}, ...}  # 类别分布
+        "class_distribution": {0: {0: 123, 1: 456, ...}, ...},  # 类别分布
+        "mean_samples_per_client": 6000.0,
+        "std_samples_per_client": 123.4,
+        "min_samples": 5800,
+        "max_samples": 6200,
+        "imbalance_ratio": 1.07
     }
 }
 ```
@@ -166,9 +189,398 @@ FederatedDatasetManager(
 
 ---
 
-## 3. 工具函数 API
+## 3. 数据库 API
 
-### 3.1 随机种子设置
+### 3.1 DatasetRegistry（数据集注册中心）
+
+```python
+from database import DatasetRegistry, DatasetRegistration
+
+# 获取单例实例
+registry = DatasetRegistry()
+
+# 注册数据集
+registration = DatasetRegistration(
+    name="mnist",
+    display_name="MNIST",
+    description="手写数字数据集",
+    num_classes=10,
+    num_features=784,
+    input_shape=(1, 28, 28),
+    raw_dataset_module="datasets.mnist.raw",
+    raw_dataset_class="MNISTRawDataset",
+    preprocessor_module="datasets.mnist.preprocess",
+    preprocessor_class="MNISTPreprocessor",
+    partitioner_module="datasets.mnist.partition",
+    partitioner_class="MNISTPartitioner",
+    train_samples=60000,
+    test_samples=10000,
+)
+registry.register(registration)
+
+# 获取数据集注册信息
+reg = registry.get("mnist")
+
+# 列出所有数据集
+datasets = registry.list_datasets(data_type="image", status="active")
+
+# 检查数据集是否存在
+exists = registry.exists("mnist")
+
+# 更新数据集信息
+registry.update("mnist", {"description": "新的描述"})
+
+# 注销数据集
+registry.unregister("mnist")
+
+# 从数据库加载/保存
+registry.load_from_database()
+registry.save_to_database()
+
+# 清空内存缓存
+registry.clear()
+```
+
+**DatasetRegistration 数据类：**
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| `name` | str | 数据集唯一标识名 |
+| `display_name` | str | 显示名称 |
+| `description` | str | 数据集描述 |
+| `num_classes` | int | 类别数 |
+| `num_features` | int | 特征维度 |
+| `input_shape` | tuple | 输入形状 |
+| `data_type` | str | 数据类型（image/text/audio等） |
+| `task_type` | str | 任务类型 |
+| `raw_dataset_module` | str | 原始数据集模块路径 |
+| `raw_dataset_class` | str | 原始数据集类名 |
+| `preprocessor_module` | str | 预处理器模块路径 |
+| `preprocessor_class` | str | 预处理器类名 |
+| `partitioner_module` | str | 划分器模块路径 |
+| `partitioner_class` | str | 划分器类名 |
+| `train_samples` | int | 训练样本数 |
+| `test_samples` | int | 测试样本数 |
+| `version` | str | 版本号 |
+| `status` | str | 状态（active/deprecated/archived） |
+
+### 3.2 PartitionStrategyRegistry（划分策略注册中心）
+
+```python
+from database import PartitionStrategyRegistry, PartitionStrategy
+
+# 获取单例实例
+strategy_registry = PartitionStrategyRegistry()
+
+# 注册划分策略
+strategy = PartitionStrategy(
+    name="dirichlet",
+    display_name="Dirichlet划分",
+    description="基于Dirichlet分布的Non-IID划分",
+    default_params={"alpha": 0.5},
+    supported_datasets=["mnist", "cifar10", "fashion_mnist"],
+    min_clients=2,
+    max_clients=10000,
+)
+strategy_registry.register(strategy)
+
+# 获取策略
+strategy = strategy_registry.get("dirichlet")
+
+# 列出所有策略
+strategies = strategy_registry.list_strategies()
+
+# 获取数据集支持的策略
+supported = strategy_registry.get_supported_strategies("mnist")
+```
+
+### 3.3 PartitionResultRegistry（划分结果注册中心）
+
+```python
+from database import PartitionResultRegistry, PartitionResult
+
+# 获取单例实例
+result_registry = PartitionResultRegistry()
+
+# 保存划分结果
+result = PartitionResult(
+    dataset_name="mnist",
+    strategy_name="dirichlet",
+    num_clients=10,
+    params={"alpha": 0.5},
+    client_indices={0: [1, 2, 3], 1: [4, 5, 6]},
+    total_samples=60000,
+)
+result_id = result_registry.save(result)
+
+# 获取划分结果
+result = result_registry.get("mnist", "dirichlet", num_clients=10)
+
+# 列出划分结果
+results = result_registry.list_results(dataset_name="mnist")
+```
+
+---
+
+## 4. 动态导入 API
+
+### 4.1 DynamicImporter（动态导入器）
+
+```python
+from database import DynamicImporter, DatasetRegistration
+
+# 动态导入类
+RawDatasetClass = DynamicImporter.import_class(
+    module_path="datasets.mnist.raw",
+    class_name="MNISTRawDataset"
+)
+
+# 动态创建实例
+raw_dataset = DynamicImporter.create_instance(
+    module_path="datasets.mnist.raw",
+    class_name="MNISTRawDataset",
+    data_root="./data"  # 传递给构造函数的参数
+)
+
+# 从注册信息导入所有组件
+registration = DatasetRegistration(...)
+components = DynamicImporter.import_dataset_components(registration)
+# 返回: {"raw_dataset": ..., "preprocessor": ..., "partitioner": ..., "manager": ...}
+
+# 创建特定组件实例
+raw_dataset = DynamicImporter.create_raw_dataset(registration, data_root="./data")
+preprocessor = DynamicImporter.create_preprocessor(registration)
+partitioner = DynamicImporter.create_partitioner(
+    registration, 
+    num_clients=10, 
+    strategy="iid"
+)
+manager = DynamicImporter.create_manager(
+    registration,
+    data_root="./data",
+    num_clients=10,
+    partition_strategy="iid"
+)
+
+# 缓存管理
+DynamicImporter.clear_cache()
+info = DynamicImporter.get_cache_info()
+is_cached = DynamicImporter.is_cached("datasets.mnist.raw", "MNISTRawDataset")
+```
+
+### 4.2 DatasetFactory（数据集工厂）
+
+```python
+from database import DatasetFactory
+
+# 创建工厂
+factory = DatasetFactory()
+
+# 创建管理器
+manager = factory.create(
+    dataset_name="mnist",
+    data_root="./data",
+    num_clients=10,
+    partition_strategy="dirichlet",
+    partition_params={"alpha": 0.5}
+)
+
+# 创建所有组件
+components = factory.create_components(
+    dataset_name="mnist",
+    data_root="./data",
+    num_clients=10,
+    partition_strategy="iid"
+)
+
+# 获取可用数据集
+available_datasets = factory.list_available_datasets()
+
+# 获取数据集信息
+info = factory.get_dataset_info("mnist")
+
+# 获取支持的划分策略
+strategies = factory.get_supported_strategies("mnist")
+```
+
+---
+
+## 5. 基类 API
+
+### 5.1 RawDatasetBase（原始数据集基类）
+
+```python
+from core import RawDatasetBase
+
+class MyRawDataset(RawDatasetBase):
+    # 必须实现的属性
+    @property
+    def num_classes(self) -> int: ...
+    
+    @property
+    def num_features(self) -> int: ...
+    
+    @property
+    def input_shape(self) -> Tuple[int, ...]: ...
+    
+    @property
+    def train_samples(self) -> int: ...
+    
+    @property
+    def test_samples(self) -> int: ...
+    
+    # 必须实现的方法
+    def download(self) -> None: ...
+    def load_train_data(self) -> Dataset: ...
+    def load_test_data(self) -> Dataset: ...
+    
+    # 可选实现的方法
+    def get_class_names(self) -> Optional[List[str]]: ...
+    def get_dataset_info(self) -> Dict[str, Any]: ...
+```
+
+**主要方法：**
+
+| 方法 | 返回 | 说明 |
+|------|------|------|
+| `download()` | None | 下载原始数据 |
+| `load_train_data()` | Dataset | 加载训练数据集 |
+| `load_test_data()` | Dataset | 加载测试数据集 |
+| `get_class_names()` | List[str] \| None | 获取类别名称列表 |
+| `get_dataset_info()` | dict | 获取数据集完整信息 |
+
+**主要属性：**
+
+| 属性 | 类型 | 说明 |
+|------|------|------|
+| `num_classes` | int | 类别数量 |
+| `num_features` | int | 特征维度 |
+| `input_shape` | tuple | 输入数据形状 |
+| `train_samples` | int | 训练样本数 |
+| `test_samples` | int | 测试样本数 |
+| `data_root` | Path | 数据根目录 |
+| `dataset_name` | str | 数据集名称 |
+
+### 5.2 PreprocessorBase（预处理器基类）
+
+```python
+from core import PreprocessorBase
+
+class MyPreprocessor(PreprocessorBase):
+    # 必须实现的属性
+    @property
+    def name(self) -> str: ...
+    
+    # 必须实现的方法
+    def fit(self, dataset: Dataset) -> "MyPreprocessor": ...
+    def get_train_transform(self) -> Callable: ...
+    def get_test_transform(self) -> Callable: ...
+    
+    # 可选实现的方法
+    def inverse_transform(self, data: Any) -> Any: ...
+    def save_params(self, path: str) -> None: ...
+    def load_params(self, path: str) -> "PreprocessorBase": ...
+    def get_params(self) -> Dict[str, Any]: ...
+    def set_params(self, params: Dict[str, Any]) -> "PreprocessorBase": ...
+```
+
+**主要方法：**
+
+| 方法 | 返回 | 说明 |
+|------|------|------|
+| `fit(dataset)` | self | 根据数据拟合预处理参数 |
+| `get_train_transform()` | Callable | 获取训练数据变换函数 |
+| `get_test_transform()` | Callable | 获取测试数据变换函数 |
+| `inverse_transform(data)` | Any | 逆向变换（反归一化） |
+| `save_params(path)` | None | 保存预处理参数 |
+| `load_params(path)` | self | 加载预处理参数 |
+| `get_params()` | dict | 获取预处理参数字典 |
+| `set_params(params)` | self | 设置预处理参数 |
+
+**ComposePreprocessor（组合预处理器）：**
+
+```python
+from core import ComposePreprocessor
+
+# 组合多个预处理器
+composed = ComposePreprocessor([preprocessor1, preprocessor2, preprocessor3])
+
+# 使用方式与普通预处理器相同
+transform = composed.get_train_transform()
+```
+
+### 5.3 PartitionerBase（划分器基类）
+
+```python
+from core import PartitionerBase
+
+class MyPartitioner(PartitionerBase):
+    # 必须实现的属性
+    @property
+    def name(self) -> str: ...
+    
+    @property
+    def strategy_type(self) -> str: ...  # "iid" 或 "non-iid"
+    
+    # 必须实现的方法
+    def partition(self, dataset: Dataset) -> Dict[int, List[int]]: ...
+```
+
+**主要方法：**
+
+| 方法 | 返回 | 说明 |
+|------|------|------|
+| `partition(dataset)` | Dict[int, List[int]] | 执行数据划分，返回 {client_id: [indices]} |
+| `get_client_dataset(dataset, client_id, client_indices)` | Subset | 获取指定客户端的数据子集 |
+| `get_distribution(dataset, client_indices)` | Dict[int, Dict[int, int]] | 获取各类别的分布 |
+| `get_statistics(dataset, client_indices)` | dict | 获取划分统计信息 |
+| `save_partition(client_indices, path)` | None | 保存划分结果 |
+| `load_partition(path)` | Dict[int, List[int]] | 加载划分结果 |
+
+**内置划分器：**
+
+| 划分器 | 类型 | 参数 | 说明 |
+|--------|------|------|------|
+| `IIDPartitioner` | IID | `num_clients`, `seed` | 随机均匀分配 |
+| `DirichletPartitioner` | Non-IID | `num_clients`, `alpha`, `seed` | Dirichlet分布分配 |
+| `PathologicalPartitioner` | Non-IID | `num_clients`, `shards_per_client`, `seed` | 病态划分 |
+
+**使用示例：**
+
+```python
+from core import IIDPartitioner, DirichletPartitioner, PathologicalPartitioner
+
+# IID划分
+partitioner = IIDPartitioner(num_clients=10, seed=42)
+client_indices = partitioner.partition(train_dataset)
+
+# Dirichlet划分（alpha越小越Non-IID）
+partitioner = DirichletPartitioner(num_clients=10, alpha=0.5, seed=42)
+client_indices = partitioner.partition(train_dataset)
+
+# 病态划分（每个客户端只获得指定数量的类别）
+partitioner = PathologicalPartitioner(
+    num_clients=10, 
+    shards_per_client=2,  # 每个客户端2个类别
+    seed=42
+)
+client_indices = partitioner.partition(train_dataset)
+
+# 获取统计信息
+stats = partitioner.get_statistics(train_dataset, client_indices)
+print(stats["samples_per_client"])  # 各客户端样本数
+print(stats["distribution"])        # 类别分布
+
+# 保存/加载划分结果
+partitioner.save_partition(client_indices, "./split.json")
+loaded_indices = partitioner.load_partition("./split.json")
+```
+
+---
+
+## 6. 工具函数 API
+
+### 6.1 随机种子设置
 
 ```python
 from utils import set_seed
@@ -177,7 +589,7 @@ worker_init_fn = set_seed(seed=42)
 # 返回的 worker_init_fn 可用于 DataLoader 的 worker_init_fn 参数
 ```
 
-### 3.2 设备获取
+### 6.2 设备获取
 
 ```python
 from utils import get_device
@@ -185,9 +597,10 @@ from utils import get_device
 device = get_device()           # 自动选择最优设备（CUDA > MPS > CPU）
 device = get_device("cuda")     # 强制使用 CUDA
 device = get_device("cpu")      # 强制使用 CPU
+device = get_device("cuda:1")   # 指定使用第2张GPU
 ```
 
-### 3.3 JSON 操作
+### 6.3 JSON 操作
 
 ```python
 from utils import save_json, load_json
@@ -199,7 +612,7 @@ save_json(data, path="./results/metrics.json", indent=2, ensure_ascii=False)
 data = load_json(path="./results/metrics.json")
 ```
 
-### 3.4 目录操作
+### 6.4 目录操作
 
 ```python
 from utils import ensure_dir
@@ -207,7 +620,7 @@ from utils import ensure_dir
 path = ensure_dir("./experiments/run_1/logs")  # 递归创建目录
 ```
 
-### 3.5 类别分布计算
+### 6.5 类别分布计算
 
 ```python
 from utils import compute_class_distribution
@@ -216,7 +629,7 @@ distribution = compute_class_distribution(labels=[0, 1, 0, 2, 1, 0])
 # 返回: {0: 3, 1: 2, 2: 1}
 ```
 
-### 3.6 分布可视化（通用）
+### 6.6 分布可视化（通用）
 
 ```python
 from utils import visualize_distribution
@@ -236,7 +649,7 @@ visualize_distribution(
 )
 ```
 
-### 3.7 字节格式化
+### 6.7 字节格式化
 
 ```python
 from utils import format_bytes
@@ -245,7 +658,7 @@ format_bytes(1536000)   # 返回: "1.46 MB"
 format_bytes(1023)      # 返回: "1023 B"
 ```
 
-### 3.8 计时装饰器
+### 6.8 计时装饰器
 
 ```python
 from utils import timer
@@ -259,9 +672,9 @@ train_model()  # 输出: [timer] train_model executed in 1.0023s
 
 ---
 
-## 4. 配置 API
+## 7. 配置 API
 
-### 4.1 数据集配置
+### 7.1 数据集配置
 
 ```python
 from configs import DatasetConfig, build_config
@@ -287,7 +700,25 @@ config = build_config(
 )
 ```
 
-### 4.2 配置转字典
+**DatasetConfig 字段：**
+
+| 字段 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `dataset_name` | str | "" | 数据集名称 |
+| `data_root` | str | "./data" | 数据根目录 |
+| `num_clients` | int | 10 | 客户端数量 |
+| `partition_strategy` | str | "iid" | 划分策略 |
+| `partition_params` | dict | {} | 划分参数 |
+| `augment` | bool | True | 是否数据增强 |
+| `normalize` | bool | True | 是否归一化 |
+| `batch_size` | int | 32 | 批次大小 |
+| `num_workers` | int | 0 | 数据加载线程数 |
+| `pin_memory` | bool | False | 是否锁页内存 |
+| `seed` | int | 42 | 随机种子 |
+| `download` | bool | True | 是否自动下载 |
+| `force_preprocess` | bool | False | 是否强制重新预处理 |
+
+### 7.2 配置转字典
 
 ```python
 config_dict = config.to_dict()      # DatasetConfig → dict
@@ -299,9 +730,9 @@ config.update(batch_size=64, num_clients=20)
 
 ---
 
-## 5. 数据集信息
+## 8. 数据集信息
 
-### 5.1 可用数据集列表
+### 8.1 可用数据集列表
 
 ```python
 from datasets import list_available_datasets
@@ -310,7 +741,7 @@ datasets = list_available_datasets()
 # 返回: ['mnist', 'cifar10', 'fashion_mnist', 'femnist']
 ```
 
-### 5.2 获取数据集信息
+### 8.2 获取数据集信息
 
 ```python
 from datasets import get_dataset_info
@@ -318,7 +749,7 @@ from datasets import get_dataset_info
 info = get_dataset_info("mnist")
 ```
 
-### 5.3 获取数据集组件类
+### 8.3 获取数据集组件类
 
 ```python
 from datasets import (
@@ -334,7 +765,7 @@ PartitionerClass = get_partitioner_class("mnist")
 ManagerClass = get_federated_manager_class("mnist")
 ```
 
-### 5.4 各数据集参数对照表
+### 8.4 各数据集参数对照表
 
 | 数据集 | 类别数 | 图像尺寸 | 训练样本 | 测试样本 |
 |--------|--------|----------|----------|----------|
@@ -343,7 +774,7 @@ ManagerClass = get_federated_manager_class("mnist")
 | Fashion-MNIST | 10 | 1×28×28 | 60,000 | 10,000 |
 | FEMNIST | 62 | 1×28×28 | 697,932 | 116,323 |
 
-### 5.5 划分策略参数
+### 8.5 划分策略参数
 
 | 策略 | 类型 | 参数 | 说明 |
 |------|------|------|------|
@@ -355,9 +786,9 @@ ManagerClass = get_federated_manager_class("mnist")
 
 ---
 
-## 6. 完整示例
+## 9. 完整示例
 
-### 6.1 基础训练流程
+### 9.1 基础训练流程
 
 ```python
 import torch
@@ -410,7 +841,7 @@ manager.visualize_client_distribution(
 )
 ```
 
-### 6.2 加载已有划分
+### 9.2 加载已有划分
 
 ```python
 from datasets import MNISTFederatedManager
@@ -431,7 +862,7 @@ manager.prepare_data()
 # 继续使用...
 ```
 
-### 6.3 对比不同划分策略
+### 9.3 对比不同划分策略
 
 ```python
 from datasets import create_federated_manager
@@ -462,7 +893,7 @@ for strategy, params in strategies:
     )
 ```
 
-### 6.4 大规模客户端设置
+### 9.4 大规模客户端设置
 
 ```python
 # FEMNIST适合大规模联邦学习场景
@@ -484,6 +915,41 @@ manager.visualize_client_distribution(
 )
 ```
 
+### 9.5 自定义数据集注册
+
+```python
+from database import DatasetRegistry, DatasetRegistration, DatasetFactory
+
+# 创建注册信息
+registration = DatasetRegistration(
+    name="my_dataset",
+    display_name="My Dataset",
+    description="自定义数据集",
+    num_classes=10,
+    num_features=784,
+    input_shape=(1, 28, 28),
+    raw_dataset_module="datasets.my_dataset.raw",
+    raw_dataset_class="MyRawDataset",
+    preprocessor_module="datasets.my_dataset.preprocess",
+    preprocessor_class="MyPreprocessor",
+    partitioner_module="datasets.my_dataset.partition",
+    partitioner_class="MyPartitioner",
+)
+
+# 注册到注册中心
+registry = DatasetRegistry()
+registry.register(registration)
+
+# 使用工厂创建管理器
+factory = DatasetFactory(registry)
+manager = factory.create(
+    dataset_name="my_dataset",
+    data_root="./data",
+    num_clients=10,
+    partition_strategy="iid"
+)
+```
+
 ---
 
 ## 附录：快速参考卡
@@ -500,6 +966,27 @@ from datasets import (
     FEMNISTFederatedManager,       # FEMNIST管理器
 )
 
+from database import (
+    DatasetRegistry,               # 数据集注册中心
+    PartitionStrategyRegistry,     # 划分策略注册中心
+    PartitionResultRegistry,       # 划分结果注册中心
+    DynamicImporter,               # 动态导入器
+    DatasetFactory,                # 数据集工厂
+    DatasetRegistration,           # 数据集注册信息
+    PartitionStrategy,             # 划分策略配置
+    PartitionResult,               # 划分结果
+)
+
+from core import (
+    RawDatasetBase,                # 原始数据集基类
+    PreprocessorBase,              # 预处理器基类
+    PartitionerBase,               # 划分器基类
+    IIDPartitioner,                # IID划分器
+    DirichletPartitioner,          # Dirichlet划分器
+    PathologicalPartitioner,       # 病态划分器
+    FederatedDatasetManager,       # 联邦学习管理器基类
+)
+
 from utils import (
     set_seed,                      # 设置随机种子
     get_device,                    # 获取设备
@@ -507,6 +994,11 @@ from utils import (
     ensure_dir,                    # 创建目录
     visualize_distribution,        # 分布可视化
     timer,                         # 计时装饰器
+)
+
+from configs import (
+    DatasetConfig,                 # 数据集配置
+    build_config,                  # 构建配置
 )
 
 # ===== 创建管理器 =====
@@ -542,5 +1034,5 @@ manager.visualize_client_distribution(
 
 ---
 
-*文档版本: 1.0*  
-*最后更新: 2026-03-02*
+*文档版本: 1.1*  
+*最后更新: 2026-03-03*
